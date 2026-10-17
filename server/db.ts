@@ -6,6 +6,11 @@ import {
   LiveAnalyticsMapData, GeoViewer, DeviceBreakdown
 } from '../src/types.js';
 import { resolveIp, getFallbackLocation } from './geo.js';
+import { store, isSupabaseEnabled } from './supabase.js';
+
+const keyOf = (v?: string) => (v || '').trim().toLowerCase();
+const PRESENCE_WINDOW_MS = 25000;
+const SYNC_TTL_MS = 3000;
 
 interface DatabaseSchema {
   settings: Settings;
@@ -90,6 +95,9 @@ const DEFAULT_TESTIMONIALS: Testimonial[] = [
 
 class Database {
   private data: DatabaseSchema;
+  private lastSync = 0;
+  private syncing: Promise<void> | null = null;
+  readonly remote = isSupabaseEnabled;
 
   constructor() {
     this.data = {
@@ -125,7 +133,8 @@ class Database {
       } catch (_) {}
     }
 
-    // 2. Then overlay dynamic runtime database from /tmp if present
+    // 2. Then overlay dynamic runtime database from /tmp if present (local mode only)
+    if (isSupabaseEnabled) return;
     const tmpPath = path.join('/tmp', 'webinar_db.json');
     try {
       if (fs.existsSync(tmpPath)) {
@@ -136,7 +145,80 @@ class Database {
     } catch (_) {}
   }
 
+  /** Reload everything from Supabase (cached for a few seconds per server instance). */
+  async ensureFresh(force = false): Promise<void> {
+    if (!this.remote) return;
+    if (!force && Date.now() - this.lastSync < SYNC_TTL_MS) return;
+    if (this.syncing) return this.syncing;
+    this.syncing = (async () => {
+      try {
+        const [config, users, progress, questions, realComments, presence] = await Promise.all([
+          store.loadConfig(),
+          store.loadRows<User>('wb_users'),
+          store.loadRows<UserProgress>('wb_progress'),
+          store.loadRows<UserQuestion>('wb_questions'),
+          store.loadRows<SyncComment>('wb_real_comments'),
+          store.loadRows<{ email: string; name: string; timestamp: number; device?: string; ip?: string }>('wb_presence'),
+        ]);
+        if (config.settings) this.data.settings = { ...DEFAULT_SETTINGS, ...config.settings };
+        if (Array.isArray(config.comments)) this.data.comments = config.comments;
+        if (Array.isArray(config.materials)) this.data.materials = config.materials;
+        if (Array.isArray(config.bonuses)) this.data.bonuses = config.bonuses;
+        if (Array.isArray(config.faq)) this.data.faq = config.faq;
+        if (Array.isArray(config.testimonials)) this.data.testimonials = config.testimonials;
+        if (typeof config.ctaClicks === 'number') this.data.ctaClicks = config.ctaClicks;
+        if (typeof config.peakUsers === 'number') this.data.peakUsers = config.peakUsers;
+        this.data.users = users;
+        this.data.progress = progress;
+        this.data.questions = questions.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+        this.data.realComments = realComments.sort((a, b) => (a.time || 0) - (b.time || 0));
+        const active: NonNullable<DatabaseSchema['activeUsers']> = {};
+        for (const p of presence) {
+          if (p && p.email) active[keyOf(p.email)] = { name: p.name, timestamp: p.timestamp, device: p.device, ip: p.ip };
+        }
+        this.data.activeUsers = active;
+        this.lastSync = Date.now();
+      } finally {
+        this.syncing = null;
+      }
+    })();
+    return this.syncing;
+  }
+
+  /** Re-read one participant's rows straight from the database before changing them. */
+  private async refreshParticipant(email: string) {
+    if (!this.remote || !email) return;
+    const id = keyOf(email);
+    const [u, p] = await Promise.all([store.getRow<User>('wb_users', id), store.getRow<UserProgress>('wb_progress', id)]);
+    this.data.users = this.data.users.filter(x => keyOf(x.email) !== id);
+    if (u) this.data.users.push(u);
+    this.data.progress = this.data.progress.filter(x => keyOf(x.email) !== id);
+    if (p) this.data.progress.push(p);
+  }
+
+  private async saveUser(u?: User) {
+    if (!u) return;
+    if (this.remote) await store.upsertRow('wb_users', keyOf(u.email), u);
+    else this.saveLocalSafe();
+  }
+
+  private async saveProgressRow(p?: UserProgress) {
+    if (!p) return;
+    if (this.remote) await store.upsertRow('wb_progress', keyOf(p.email), p);
+    else this.saveLocalSafe();
+  }
+
+  private async saveConfigKey(key: 'settings' | 'comments' | 'materials' | 'bonuses' | 'faq' | 'testimonials' | 'ctaClicks' | 'peakUsers') {
+    if (this.remote) await store.saveConfig(key, (this.data as any)[key]);
+    else this.saveLocalSafe();
+  }
+
+  storageLabel(): string {
+    return this.remote ? 'Supabase (Postgres)' : 'Arquivo local (JSON)';
+  }
+
   private saveLocalSafe() {
+    if (this.remote) return;
     const targets = [
       path.join('/tmp', 'webinar_db.json'),
       path.join(process.cwd(), 'data', 'db.json')
@@ -156,6 +238,12 @@ class Database {
   }
 
   async saveAsDefault(): Promise<boolean> {
+    if (this.remote) {
+      for (const k of ['settings', 'comments', 'materials', 'bonuses', 'faq', 'testimonials'] as const) {
+        await this.saveConfigKey(k);
+      }
+      return true;
+    }
     const defaultPath = path.join(process.cwd(), 'data', 'default_settings.json');
     try {
       const dir = path.dirname(defaultPath);
@@ -280,7 +368,7 @@ class Database {
       ...settings,
       isLiveActive: nextLiveState 
     };
-    this.saveLocalSafe();
+    await this.saveConfigKey('settings');
     return this.data.settings;
   }
 
@@ -289,17 +377,14 @@ class Database {
   }
 
   async createUser(name: string, email: string, device?: string, ip?: string): Promise<User> {
-    const adminEmail = process.env.ADMIN_EMAIL ? process.env.ADMIN_EMAIL.toLowerCase() : 'agwrdoficial@gmail.com';
-    const isAdmin = email.toLowerCase() === adminEmail;
-
-    const existing = this.data.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    await this.refreshParticipant(email);
+    const existing = this.data.users.find(u => keyOf(u.email) === keyOf(email));
     if (existing) {
-      if (isAdmin && existing.role !== 'admin') {
-        existing.role = 'admin';
-      }
+      if (name && name.trim()) existing.name = name.trim();
       if (device) existing.device = device;
       if (ip) existing.ip = ip;
-      this.saveLocalSafe();
+      existing.role = 'user';
+      await this.saveUser(existing);
       return existing;
     }
 
@@ -307,14 +392,14 @@ class Database {
       id: 'u_' + Math.random().toString(36).substr(2, 9),
       name,
       email,
-      role: isAdmin ? 'admin' : 'user',
+      role: 'user',
       createdAt: new Date().toISOString(),
       device,
       ip
     };
 
     this.data.users.push(newUser);
-    this.saveLocalSafe();
+    await this.saveUser(newUser);
     return newUser;
   }
 
@@ -324,7 +409,7 @@ class Database {
 
   async saveComments(comments: SyncComment[]): Promise<SyncComment[]> {
     this.data.comments = comments;
-    this.saveLocalSafe();
+    await this.saveConfigKey('comments');
     return this.data.comments;
   }
 
@@ -344,7 +429,7 @@ class Database {
     };
 
     this.data.questions.push(newQuestion);
-    this.saveLocalSafe();
+    if (this.remote) await store.upsertRow('wb_questions', newQuestion.id, newQuestion); else this.saveLocalSafe();
     return newQuestion;
   }
 
@@ -353,7 +438,7 @@ class Database {
     if (q) {
       q.answered = true;
       q.answer = answer;
-      this.saveLocalSafe();
+      if (this.remote) await store.upsertRow('wb_questions', q.id, q); else this.saveLocalSafe();
       return q;
     }
     return null;
@@ -363,7 +448,7 @@ class Database {
     const index = this.data.questions.findIndex(item => item.id === id);
     if (index !== -1) {
       this.data.questions.splice(index, 1);
-      this.saveLocalSafe();
+      if (this.remote) await store.deleteRow('wb_questions', id); else this.saveLocalSafe();
       return true;
     }
     return false;
@@ -375,7 +460,7 @@ class Database {
 
   async saveMaterials(materials: Material[]): Promise<Material[]> {
     this.data.materials = materials;
-    this.saveLocalSafe();
+    await this.saveConfigKey('materials');
     return this.data.materials;
   }
 
@@ -385,7 +470,7 @@ class Database {
 
   async saveBonuses(bonuses: Bonus[]): Promise<Bonus[]> {
     this.data.bonuses = bonuses;
-    this.saveLocalSafe();
+    await this.saveConfigKey('bonuses');
     return this.data.bonuses;
   }
 
@@ -395,7 +480,7 @@ class Database {
 
   async saveFAQ(faq: FAQItem[]): Promise<FAQItem[]> {
     this.data.faq = faq;
-    this.saveLocalSafe();
+    await this.saveConfigKey('faq');
     return this.data.faq;
   }
 
@@ -405,7 +490,7 @@ class Database {
 
   async saveTestimonials(testimonials: Testimonial[]): Promise<Testimonial[]> {
     this.data.testimonials = testimonials;
-    this.saveLocalSafe();
+    await this.saveConfigKey('testimonials');
     return this.data.testimonials;
   }
 
@@ -414,6 +499,7 @@ class Database {
   }
 
   async saveProgress(userId: string, email: string, name: string, watchedSeconds: number, durationSeconds: number, device?: string, ip?: string): Promise<UserProgress> {
+    await this.refreshParticipant(email);
     const existingIndex = this.data.progress.findIndex(p => p.userId === userId || p.email.toLowerCase() === email.toLowerCase());
     const completed = watchedSeconds > 0 && durationSeconds > 0 && (watchedSeconds / durationSeconds) >= 0.9;
     
@@ -451,11 +537,13 @@ class Database {
       if (ip) userRec.ip = ip;
     }
 
-    this.saveLocalSafe();
+    await this.saveProgressRow(record);
+    await this.saveUser(userRec);
     return record;
   }
 
   async incrementCtaClicks(userId?: string, email?: string): Promise<number> {
+    if (email) await this.refreshParticipant(email);
     this.data.ctaClicks++;
     const now = new Date().toISOString();
 
@@ -479,9 +567,11 @@ class Database {
         progRec.clickedCta = true;
         progRec.ctaClickTime = now;
       }
+      await this.saveUser(userRec);
+      await this.saveProgressRow(progRec);
     }
 
-    this.saveLocalSafe();
+    await this.saveConfigKey('ctaClicks');
     return this.data.ctaClicks;
   }
 
@@ -491,7 +581,10 @@ class Database {
 
     if (!cleanId && !cleanEmail) return false;
 
+    if (cleanEmail) await this.refreshParticipant(cleanEmail);
     let updated = false;
+    const touchedUsers: User[] = [];
+    const touchedProgress: UserProgress[] = [];
     for (const u of this.data.users) {
       if ((cleanId && u.id === cleanId) || (cleanEmail && cleanEmail.length > 0 && u.email.toLowerCase() === cleanEmail)) {
         u.clickedCta = forceStatus !== undefined ? forceStatus : !u.clickedCta;
@@ -500,6 +593,7 @@ class Database {
         } else {
           delete u.ctaClickTime;
         }
+        touchedUsers.push(u);
         updated = true;
       }
     }
@@ -512,13 +606,13 @@ class Database {
         } else {
           delete p.ctaClickTime;
         }
+        touchedProgress.push(p);
         updated = true;
       }
     }
 
-    if (updated) {
-      this.saveLocalSafe();
-    }
+    for (const u of touchedUsers) await this.saveUser(u);
+    for (const p of touchedProgress) await this.saveProgressRow(p);
     return updated;
   }
 
@@ -527,44 +621,47 @@ class Database {
       this.data.activeUsers = {};
     }
     if (!email || !email.trim()) {
-      return { onlineNow: this.getActiveUsersCount() };
+      return { onlineNow: await this.countOnline() };
     }
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = keyOf(email);
     const cleanName = name ? name.trim() : 'Usuário';
-
-    this.data.activeUsers[cleanEmail] = {
+    const entry = {
       name: cleanName,
       timestamp: Date.now(),
       device: device || this.data.activeUsers[cleanEmail]?.device,
       ip: ip || this.data.activeUsers[cleanEmail]?.ip
     };
+    this.data.activeUsers[cleanEmail] = entry;
 
-    // Auto-register user in DB if not present
-    const exists = this.data.users.find(u => u.email.toLowerCase() === cleanEmail);
+    // Auto-register the participant if it does not exist yet (never overwrites existing data)
+    const newUser: User = {
+      id: 'u_' + Math.random().toString(36).substr(2, 9),
+      name: cleanName,
+      email: cleanEmail,
+      createdAt: new Date().toISOString(),
+      role: 'user',
+      device,
+      ip
+    };
+
+    if (this.remote) {
+      await store.upsertRow('wb_presence', cleanEmail, { email: cleanEmail, ...entry });
+      await store.insertIfMissing('wb_users', cleanEmail, newUser);
+      return { onlineNow: await this.countOnline() };
+    }
+
+    const exists = this.data.users.find(u => keyOf(u.email) === cleanEmail);
     if (!exists) {
-      this.data.users.push({
-        id: 'u_' + Math.random().toString(36).substr(2, 9),
-        name: cleanName,
-        email: cleanEmail,
-        createdAt: new Date().toISOString(),
-        role: 'user',
-        device,
-        ip
-      });
+      this.data.users.push(newUser);
     } else {
-      if (name && cleanName && exists.name !== cleanName) {
-        exists.name = cleanName;
-      }
+      if (name && cleanName && exists.name !== cleanName) exists.name = cleanName;
       if (device) exists.device = device;
       if (ip) exists.ip = ip;
     }
 
-    // Cleanup expired active users (> 25s)
     const now = Date.now();
     for (const [key, val] of Object.entries(this.data.activeUsers)) {
-      if (now - val.timestamp > 25000) {
-        delete this.data.activeUsers[key];
-      }
+      if (now - val.timestamp > PRESENCE_WINDOW_MS) delete this.data.activeUsers[key];
     }
 
     this.saveLocalSafe();
@@ -572,12 +669,20 @@ class Database {
   }
 
   async disconnectUser(email: string): Promise<{ onlineNow: number }> {
-    if (this.data.activeUsers && email) {
-      const cleanEmail = email.trim().toLowerCase();
-      delete this.data.activeUsers[cleanEmail];
-      this.saveLocalSafe();
+    if (email) {
+      const cleanEmail = keyOf(email);
+      if (this.data.activeUsers) delete this.data.activeUsers[cleanEmail];
+      if (this.remote) await store.deleteRow('wb_presence', cleanEmail);
+      else this.saveLocalSafe();
     }
-    return { onlineNow: this.getActiveUsersCount() };
+    return { onlineNow: await this.countOnline() };
+  }
+
+  async countOnline(): Promise<number> {
+    if (this.remote) {
+      try { return await store.countRecentPresence(PRESENCE_WINDOW_MS); } catch { /* fall back to cache */ }
+    }
+    return this.getActiveUsersCount();
   }
 
   getActiveUsersCount(): number {
@@ -667,16 +772,23 @@ class Database {
     const targetId = idOrEmail ? decodeURIComponent(idOrEmail).trim().toLowerCase() : '';
     const targetEmail = email ? email.trim().toLowerCase() : targetId;
 
+    const removedUsers: string[] = [];
+    const removedProgress: string[] = [];
     this.data.users = this.data.users.filter(u => {
+      const keep = (() => {
       const uId = u.id ? u.id.trim().toLowerCase() : '';
       const uEmail = u.email ? u.email.trim().toLowerCase() : '';
       if (targetId && uId === targetId) return false;
       if (targetEmail && uEmail === targetEmail) return false;
       if (targetId && uEmail && targetId === uEmail) return false;
       return true;
+      })();
+      if (!keep) removedUsers.push(keyOf(u.email));
+      return keep;
     });
 
     this.data.progress = this.data.progress.filter(p => {
+      const keep = (() => {
       const pUserId = p.userId ? p.userId.trim().toLowerCase() : '';
       const pId = p.id ? p.id.trim().toLowerCase() : '';
       const pEmail = p.email ? p.email.trim().toLowerCase() : '';
@@ -684,9 +796,22 @@ class Database {
       if (targetEmail && pEmail === targetEmail) return false;
       if (targetId && pEmail && targetId === pEmail) return false;
       return true;
+      })();
+      if (!keep) removedProgress.push(keyOf(p.email));
+      return keep;
     });
 
-    this.saveLocalSafe();
+    if (this.remote) {
+      for (const id of new Set(removedUsers)) await store.deleteRow('wb_users', id);
+      for (const id of new Set(removedProgress)) await store.deleteRow('wb_progress', id);
+      if (targetEmail) {
+        await store.deleteRow('wb_users', targetEmail);
+        await store.deleteRow('wb_progress', targetEmail);
+        await store.deleteRow('wb_presence', targetEmail);
+      }
+    } else {
+      this.saveLocalSafe();
+    }
     return true;
   }
 
@@ -694,7 +819,6 @@ class Database {
     const leads = await this.getLeads();
     const leadClicks = leads.filter(l => l.clickedCta).length;
     this.data.ctaClicks = leadClicks;
-    this.saveLocalSafe();
     return this.data.ctaClicks;
   }
 
@@ -713,7 +837,7 @@ class Database {
       photoUrl: photoUrl || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`
     };
     this.data.realComments.push(newComment);
-    this.saveLocalSafe();
+    if (this.remote) await store.upsertRow('wb_real_comments', newComment.id, newComment); else this.saveLocalSafe();
     return newComment;
   }
 
@@ -721,13 +845,13 @@ class Database {
     if (!this.data.realComments) this.data.realComments = [];
     const initialLength = this.data.realComments.length;
     this.data.realComments = this.data.realComments.filter(c => c.id !== id);
-    this.saveLocalSafe();
+    if (this.remote) await store.deleteRow('wb_real_comments', id); else this.saveLocalSafe();
     return this.data.realComments.length < initialLength;
   }
 
   async clearRealComments(): Promise<void> {
     this.data.realComments = [];
-    this.saveLocalSafe();
+    if (this.remote) await store.clearTable('wb_real_comments'); else this.saveLocalSafe();
   }
 
   getPeakUsers(): number {
@@ -824,7 +948,7 @@ class Database {
     // Track Peak based on actual real viewers
     if (totalActive > (this.data.peakUsers || 0)) {
       this.data.peakUsers = totalActive;
-      this.saveLocalSafe();
+      await this.saveConfigKey('peakUsers');
     }
 
     const totalDevices = desktopCount + mobileCount + tabletCount;
