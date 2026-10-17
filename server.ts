@@ -503,6 +503,20 @@ app.post('/api/cta/click', async (req, res, next) => {
   }
 });
 
+// 11a. Landing page visits (for the dashboard funnel)
+app.post('/api/track/visit', async (_req, res) => {
+  try {
+    await db.trackVisit();
+  } catch (err) {
+    console.error('visit tracking error', err);
+  }
+  res.json({ ok: true });
+});
+
+app.get('/api/analytics/visits', requireAdmin, async (_req, res) => {
+  res.json(db.getVisits());
+});
+
 // 11b. Leads Management
 app.get('/api/leads', requireAdmin, async (req, res, next) => {
   try {
