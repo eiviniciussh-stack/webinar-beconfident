@@ -6,12 +6,14 @@ import {
   ArrowLeft, CheckCircle2, RefreshCw, Star, ArrowUpRight, Check, CheckSquare, Calendar,
   Activity, AlertTriangle, Terminal, XCircle, Info, Database,
   UserCheck, Clock, MousePointerClick, Search, Download, TrendingUp, UserPlus, ExternalLink, Filter,
-  Radio, Send, MessageSquare, Phone, Smartphone, Laptop, Tablet, Globe, MapPin, Zap, LogOut, ShieldCheck, LayoutDashboard, Video, UserCog, ChevronLeft, ChevronRight
+  Radio, Send, MessageSquare, Phone, Smartphone, Laptop, Tablet, Globe, MapPin, Zap, LogOut, ShieldCheck, LayoutDashboard, Video, UserCog, ChevronLeft, ChevronRight, MonitorPlay, PhoneCall
 } from 'lucide-react';
 import { useToast } from './Toast';
 import { BeConfidentMark } from './BrandHeader';
 import AdminUsersPanel from './AdminUsersPanel';
 import DashboardPanel from './DashboardPanel';
+import WebinarsPanel from './WebinarsPanel';
+import AttendancePanel from './AttendancePanel';
 import * as adminAuth from '../adminAuth';
 import { 
   Settings as AppSettings, SyncComment, FAQItem, Bonus, 
@@ -102,7 +104,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
   const [loginPassword, setLoginPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!adminAuth.getSession());
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'leads' | 'webinar' | 'questions' | 'users' | 'content' | 'admins'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'webinars' | 'attendance' | 'leads' | 'webinar' | 'questions' | 'users' | 'content' | 'admins'>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [dbStatus, setDbStatus] = useState<{ status: string; storage: string } | null>(null);
@@ -998,6 +1000,8 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
 
   const NAV: { id: typeof activeTab; label: string; icon: React.ReactNode }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
+    { id: 'webinars', label: 'Webinars', icon: <MonitorPlay className="h-[18px] w-[18px]" /> },
+    { id: 'attendance', label: 'Atendimento', icon: <PhoneCall className="h-[18px] w-[18px]" /> },
     { id: 'leads', label: 'Leads', icon: <UserCheck className="h-[18px] w-[18px]" /> },
     { id: 'webinar', label: 'Vídeos', icon: <Video className="h-[18px] w-[18px]" /> },
     { id: 'questions', label: 'Sala ao vivo', icon: <Radio className="h-[18px] w-[18px]" /> },
@@ -1007,8 +1011,10 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
   ];
   const PAGE_TITLES: Record<string, string> = {
     dashboard: 'Dashboard geral',
+    webinars: 'Webinars',
+    attendance: 'Atendimento',
     leads: 'Leads',
-    webinar: 'Vídeos',
+    webinar: 'Vídeos · sala principal',
     questions: 'Sala ao vivo',
     users: 'Progresso dos alunos',
     content: 'Conteúdos da sala',
@@ -1303,6 +1309,8 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
         <AnimatePresence mode="wait">
           
           {activeTab === 'dashboard' && <DashboardPanel leads={leads} stats={stats} settings={settings} />}
+          {activeTab === 'webinars' && <WebinarsPanel onOpenMainSettings={() => setActiveTab('webinar')} />}
+          {activeTab === 'attendance' && <AttendancePanel />}
 
           {/* DEDICATED LEADS TAB */}
           {activeTab === 'leads' && (

@@ -7,6 +7,7 @@ import {
 import { Settings as AppSettings, User, SyncComment, FAQItem, Bonus, Testimonial, UserProgress } from '../types';
 import { useToast } from './Toast';
 import Chat from './Chat';
+import { getRoomId } from '../room';
 import BrandHeader, { menuIcons } from './BrandHeader';
 
 interface WebinarScreenProps {
@@ -349,7 +350,7 @@ export default function WebinarScreen({
         await fetch('/api/ping', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: user.email, name: user.name, device: getDeviceInfo() })
+          body: JSON.stringify({ email: user.email, name: user.name, device: getDeviceInfo(), webinarId: getRoomId() })
         });
       } catch (err) {
         console.error("Ping error:", err);

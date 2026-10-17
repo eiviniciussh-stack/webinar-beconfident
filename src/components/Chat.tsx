@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, Clock, Paperclip, Smile, ShieldCheck, Lock, Gift, Timer, Users, Radio } from 'lucide-react';
-import { SyncComment, User, UserQuestion, Material } from '../types';
+import { SyncComment, User, Material, SupportMessage } from '../types';
 import { useToast } from './Toast';
+import { getRoomId } from '../room';
 
 interface ChatProps {
   currentTime: number; // in seconds
@@ -17,7 +18,9 @@ export default function Chat({ currentTime, syncComments, user, materials, showC
   const [activeTab, setActiveTab] = useState<'chat' | 'questions' | 'offer'>('chat');
   const [questionText, setQuestionText] = useState('');
   const [chatInputText, setChatInputText] = useState('');
-  const [userQuestions, setUserQuestions] = useState<UserQuestion[]>([]);
+  const [supportThreads, setSupportThreads] = useState<{ id: string; status: string; messages: SupportMessage[]; createdAt: string }[]>([]);
+  const [unreadSupport, setUnreadSupport] = useState(0);
+  const seenAgentMsgs = useRef<number>(-1);
   const [isSubmittingQuestion, setIsSubmittingQuestion] = useState(false);
   const [localComments, setLocalComments] = useState<SyncComment[]>([]);
   const [timeLeft, setTimeLeft] = useState<number>(0);
@@ -116,67 +119,62 @@ export default function Chat({ currentTime, syncComments, user, materials, showC
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Fetch real user questions
-  const fetchQuestions = async () => {
+  // Atendimento: conversa individual com a equipe (tempo real por polling)
+  const supportMessages = supportThreads.flatMap((t) => t.messages || []);
+  const fetchSupport = async () => {
     try {
-      const response = await fetch(`/api/questions?email=${encodeURIComponent((user.email || '').trim().toLowerCase())}`);
-      if (response.ok) {
-        const data: UserQuestion[] = await response.json();
-        // Filter questions submitted by this logged-in email or userId
-        const userEmailClean = (user.email || '').trim().toLowerCase();
-        const filtered = data.filter(q => (q.email || '').trim().toLowerCase() === userEmailClean || (user.id && q.userId === user.id));
-        setUserQuestions(prev => {
-          const map = new Map<string, UserQuestion>();
-          prev.forEach(q => map.set(q.id, q));
-          filtered.forEach(q => {
-            const existing = map.get(q.id);
-            if (existing) {
-              map.set(q.id, { ...existing, ...q });
-            } else {
-              map.set(q.id, q);
-            }
-          });
-          return Array.from(map.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        });
-      }
+      const qs = new URLSearchParams({ email: (user.email || '').trim().toLowerCase(), webinarId: getRoomId() });
+      const response = await fetch(`/api/support/my?${qs}`);
+      if (response.ok) setSupportThreads(await response.json());
     } catch (err) {
-      console.error("Error fetching user questions:", err);
+      console.error('Error fetching support messages:', err);
     }
   };
 
   useEffect(() => {
-    fetchQuestions();
-    const interval = setInterval(fetchQuestions, 1500);
+    fetchSupport();
+    const interval = setInterval(fetchSupport, 3000);
     return () => clearInterval(interval);
-  }, [user.email, user.id]);
+  }, [user.email]);
+
+  // Badge on the "Suporte" tab when the team replies
+  useEffect(() => {
+    const agentCount = supportMessages.filter((m) => m.from === 'agent').length;
+    if (seenAgentMsgs.current < 0) {
+      seenAgentMsgs.current = agentCount;
+      return;
+    }
+    if (activeTab === 'questions') {
+      seenAgentMsgs.current = agentCount;
+      setUnreadSupport(0);
+    } else if (agentCount > seenAgentMsgs.current) {
+      setUnreadSupport(agentCount - seenAgentMsgs.current);
+    }
+  }, [supportMessages.length, activeTab]);
+
+  const supportEndRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (activeTab === 'questions') supportEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [supportMessages.length, activeTab]);
 
   const handleSendQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!questionText.trim()) return;
+    const text = questionText.trim();
+    if (!text) return;
 
     setIsSubmittingQuestion(true);
     try {
-      const response = await fetch('/api/questions', {
+      const response = await fetch('/api/support/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: user.name,
-          email: user.email,
-          question: questionText.trim(),
-          userId: user.id
-        })
+        body: JSON.stringify({ webinarId: getRoomId(), name: user.name, email: user.email, text }),
       });
-
-      if (!response.ok) {
-        throw new Error('Falha ao enviar pergunta');
-      }
-
-      toast.success('Pergunta Enviada!', 'Sua dúvida foi enviada aos administradores do webinar.');
+      if (!response.ok) throw new Error('Falha ao enviar mensagem');
       setQuestionText('');
-      fetchQuestions();
+      fetchSupport();
     } catch (err) {
       console.error(err);
-      toast.error('Erro ao enviar', 'Não foi possível cadastrar sua pergunta no servidor.');
+      toast.error('Erro ao enviar', 'Não foi possível enviar sua mensagem. Tente de novo.');
     } finally {
       setIsSubmittingQuestion(false);
     }
@@ -246,7 +244,12 @@ export default function Chat({ currentTime, syncComments, user, materials, showC
               : 'text-zinc-500 hover:text-zinc-700'
           }`}
         >
-          Suporte
+          <span className="inline-flex items-center gap-1.5">
+            Suporte
+            {unreadSupport > 0 && (
+              <span className="min-w-4 h-4 px-1 rounded-full bg-[#7E2EFF] text-white text-[10px] leading-4">{unreadSupport}</span>
+            )}
+          </span>
         </button>
 
         {showCta && (
@@ -318,37 +321,34 @@ export default function Chat({ currentTime, syncComments, user, materials, showC
               exit={{ opacity: 0 }}
               className="space-y-4 flex flex-col justify-between h-full"
             >
-              <div className="flex-1 overflow-y-auto space-y-3">
-                <div className="border border-indigo-100 bg-indigo-50/40 p-3 rounded-lg text-xs text-indigo-700 leading-relaxed font-sans">
-                  Envie sua dúvida no formulário abaixo! Ela será respondida de forma personalizada pela nossa equipe de suporte.
+              <div className="flex-1 overflow-y-auto space-y-2.5">
+                <div className="border border-[#E2D3FE] bg-[#F7F2FF] p-3 rounded-xl text-xs text-[#4A12A6] leading-relaxed font-sans">
+                  Fale com a nossa equipe em particular. Só você e o atendente veem estas mensagens.
                 </div>
 
-                {userQuestions.length === 0 ? (
-                  <div className="text-center py-12 text-zinc-400 text-xs">
-                    Nenhuma dúvida enviada ainda.
-                  </div>
+                {supportMessages.length === 0 ? (
+                  <div className="text-center py-12 text-zinc-400 text-xs">Nenhuma mensagem ainda. Escreva sua dúvida abaixo.</div>
                 ) : (
-                  userQuestions.map((q) => (
-                    <div key={q.id} className="p-3 bg-white border border-zinc-200/60 rounded-xl space-y-2 shadow-sm text-left">
-                      <div className="flex items-center justify-between gap-2 text-[10px] font-mono">
-                        <span className="text-zinc-400">{new Date(q.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        <span className={`px-2 py-0.5 rounded-full font-sans font-bold uppercase tracking-wider text-[9px] ${
-                          q.answered ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-amber-50 text-amber-600 border border-amber-100'
-                        }`}>
-                          {q.answered ? 'Respondida' : 'Enviada'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-zinc-800 font-sans">{q.question}</p>
-
-                      {q.answered && q.answer && (
-                        <div className="mt-2 p-2.5 bg-zinc-50 rounded-lg border-l-2 border-indigo-500 text-[11px] text-zinc-600 space-y-1 font-sans">
-                          <p className="font-semibold text-zinc-800">Suporte respondeu:</p>
-                          <p>{q.answer}</p>
+                  supportMessages.map((m) => (
+                    <div key={m.id} className={`flex ${m.from === 'lead' ? 'justify-end' : 'justify-start'}`}>
+                      <div
+                        className={`max-w-[85%] px-3 py-2 rounded-2xl text-[13px] leading-snug shadow-sm ${
+                          m.from === 'lead' ? 'bg-[#7E2EFF] text-white rounded-br-md' : 'bg-white border border-zinc-200/70 text-zinc-800 rounded-bl-md'
+                        }`}
+                      >
+                        {m.from === 'agent' && <div className="text-[10px] font-semibold text-[#7E2EFF] mb-0.5">Equipe BeConfident</div>}
+                        <p className="whitespace-pre-wrap break-words">{m.text}</p>
+                        <div className={`text-[9px] mt-1 text-right ${m.from === 'lead' ? 'text-white/70' : 'text-zinc-400'}`}>
+                          {new Date(m.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
-                      )}
+                      </div>
                     </div>
                   ))
                 )}
+                {supportThreads.length > 0 && supportThreads[supportThreads.length - 1].status === 'closed' && (
+                  <div className="text-center text-[11px] text-zinc-400 py-1">Atendimento finalizado. Se precisar, envie uma nova mensagem.</div>
+                )}
+                <div ref={supportEndRef} />
               </div>
             </motion.div>
           )}
@@ -448,7 +448,7 @@ export default function Chat({ currentTime, syncComments, user, materials, showC
                 required
                 value={questionText}
                 onChange={(e) => setQuestionText(e.target.value)}
-                placeholder="Sua dúvida para o suporte..."
+                placeholder="Escreva para o suporte..."
                 disabled={isSubmittingQuestion}
                 className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-zinc-800 placeholder-zinc-400 py-1"
               />
