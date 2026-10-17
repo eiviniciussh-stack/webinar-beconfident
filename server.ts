@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { db } from './server/db.js';
+import { registerAuthRoutes, requireAdmin, getAdminEmail } from './server/auth.js';
 import { WebinarStats } from './src/types.js';
 
 const app = express();
@@ -11,15 +12,13 @@ const PORT = 3000;
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Default Admin Passcode Hash (SHA-256). Override in production with the ADMIN_PASSCODE env var.
-const DEFAULT_PASSCODE_HASH = '05f5dcff3399622c9608a8b42d5bbaa888ff1445b700181fb2f5fa4aea91ba05';
 
 // Active online users tracking in memory
 const activeUsersMap = new Map<string, { name: string; timestamp: number }>();
 
 // Helper to fire webhooks formatted with both URL query params and form body
 // so platforms like Make.com (Integromat), Zapier, and n8n automatically extract
-// discrete variables (event, name, whatsapp, faturamento, etc.) into separate bundle items.
+// discrete variables (event, name, whatsapp, etc.) into separate bundle items.
 async function fireWebhook(rawUrl: string, payload: Record<string, any>) {
   if (!rawUrl || !rawUrl.trim()) return;
   const baseUrl = rawUrl.trim();
@@ -82,31 +81,25 @@ function parseUserDevice(uaHeader: string | undefined, bodyDevice?: string): str
 
 // --- API ROUTES ---
 
-// 0. DB Status
-app.get('/api/db-status', async (req, res, next) => {
+// Keep the in-memory cache in sync with Supabase (skipped for the high-frequency ping routes)
+app.use('/api', async (req, _res, next) => {
+  if (req.path.startsWith('/ping')) return next();
   try {
-    res.json({ status: "online", storage: "local_json" });
+    await db.ensureFresh();
+    next();
   } catch (err) {
     next(err);
   }
 });
 
-// Admin Passcode Verification (Encrypted/Hashed)
-app.post('/api/admin/verify', (req, res) => {
-  const { passcode } = req.body || {};
-  if (!passcode || typeof passcode !== 'string') {
-    return res.status(401).json({ success: false, message: "Senha administrativa incorreta" });
-  }
+registerAuthRoutes(app);
 
-  const inputHash = crypto.createHash('sha256').update(passcode).digest('hex');
-  const targetHash = process.env.ADMIN_PASSCODE 
-    ? crypto.createHash('sha256').update(process.env.ADMIN_PASSCODE).digest('hex')
-    : DEFAULT_PASSCODE_HASH;
-
-  if (inputHash === targetHash) {
-    res.json({ success: true, message: "Acesso liberado" });
-  } else {
-    res.status(401).json({ success: false, message: "Senha administrativa incorreta" });
+// 0. DB Status
+app.get('/api/db-status', requireAdmin, async (req, res, next) => {
+  try {
+    res.json({ status: "online", storage: db.storageLabel() });
+  } catch (err) {
+    next(err);
   }
 });
 
@@ -114,13 +107,16 @@ app.post('/api/admin/verify', (req, res) => {
 app.get('/api/settings', async (req, res, next) => {
   try {
     const settings = await db.getSettings();
-    res.json(settings);
+    if (await getAdminEmail(req)) return res.json(settings);
+    // Hide integration details from the public room
+    const { webhookUrl, webhookEnabled, ...publicSettings } = settings as any;
+    res.json(publicSettings);
   } catch (err) {
     next(err);
   }
 });
 
-app.post('/api/settings', async (req, res, next) => {
+app.post('/api/settings', requireAdmin, async (req, res, next) => {
   try {
     const updated = await db.updateSettings(req.body);
     await db.saveAsDefault();
@@ -130,7 +126,7 @@ app.post('/api/settings', async (req, res, next) => {
   }
 });
 
-app.post('/api/save-defaults', async (req, res, next) => {
+app.post('/api/save-defaults', requireAdmin, async (req, res, next) => {
   try {
     if (req.body && Object.keys(req.body).length > 0) {
       await db.updateSettings(req.body);
@@ -143,7 +139,7 @@ app.post('/api/save-defaults', async (req, res, next) => {
 });
 
 // 2. Stats & Live Map Analytics
-app.get('/api/stats', async (req, res, next) => {
+app.get('/api/stats', requireAdmin, async (req, res, next) => {
   try {
     const users = await db.getUsers();
     const questions = await db.getQuestions();
@@ -167,7 +163,7 @@ app.get('/api/stats', async (req, res, next) => {
   }
 });
 
-app.get('/api/analytics/live-map', async (req, res, next) => {
+app.get('/api/analytics/live-map', requireAdmin, async (req, res, next) => {
   try {
     const liveMapData = await db.getLiveMapData();
     res.json(liveMapData);
@@ -180,7 +176,7 @@ app.get('/api/analytics/live-map', async (req, res, next) => {
 // 3. User Login / Registration
 app.post('/api/users/login', async (req, res, next) => {
   try {
-    const { name, email, faturamento, device } = req.body;
+    const { name, email, device } = req.body;
     if (!name || !email) {
       return res.status(400).json({ error: 'Nome e email são obrigatórios' });
     }
@@ -199,7 +195,6 @@ app.post('/api/users/login', async (req, res, next) => {
         name: user.name,
         email: user.email,
         whatsapp: user.email,
-        faturamento: faturamento || 'Não informado',
         device: userDevice,
         ip: clientIp,
         createdAt: user.createdAt,
@@ -252,7 +247,11 @@ app.post('/api/ping/offline', express.text({ type: '*/*' }), async (req, res, ne
 app.get('/api/questions', async (req, res, next) => {
   try {
     const questions = await db.getQuestions();
-    res.json(questions);
+    if (await getAdminEmail(req)) return res.json(questions);
+    // Participants only see their own questions
+    const email = String(req.query.email || '').trim().toLowerCase();
+    if (!email) return res.json([]);
+    res.json(questions.filter(q => (q.email || '').trim().toLowerCase() === email));
   } catch (err) {
     next(err);
   }
@@ -285,7 +284,7 @@ app.post('/api/questions', async (req, res, next) => {
   }
 });
 
-app.post('/api/questions/:id/answer', async (req, res, next) => {
+app.post('/api/questions/:id/answer', requireAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { answer } = req.body;
@@ -299,7 +298,7 @@ app.post('/api/questions/:id/answer', async (req, res, next) => {
   }
 });
 
-app.delete('/api/questions/:id', async (req, res, next) => {
+app.delete('/api/questions/:id', requireAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
     const success = await db.deleteQuestion(id);
@@ -320,7 +319,7 @@ app.get('/api/comments', async (req, res, next) => {
   }
 });
 
-app.post('/api/comments', async (req, res, next) => {
+app.post('/api/comments', requireAdmin, async (req, res, next) => {
   try {
     const saved = await db.saveComments(req.body);
     res.json(saved);
@@ -352,7 +351,7 @@ app.post('/api/real-comments', async (req, res, next) => {
   }
 });
 
-app.delete('/api/real-comments/:id', async (req, res, next) => {
+app.delete('/api/real-comments/:id', requireAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
     await db.deleteRealComment(id);
@@ -362,7 +361,7 @@ app.delete('/api/real-comments/:id', async (req, res, next) => {
   }
 });
 
-app.delete('/api/real-comments', async (req, res, next) => {
+app.delete('/api/real-comments', requireAdmin, async (req, res, next) => {
   try {
     await db.clearRealComments();
     res.json({ success: true });
@@ -371,7 +370,7 @@ app.delete('/api/real-comments', async (req, res, next) => {
   }
 });
 
-app.post('/api/real-comments/clear', async (req, res, next) => {
+app.post('/api/real-comments/clear', requireAdmin, async (req, res, next) => {
   try {
     await db.clearRealComments();
     res.json({ success: true });
@@ -390,7 +389,7 @@ app.get('/api/materials', async (req, res, next) => {
   }
 });
 
-app.post('/api/materials', async (req, res, next) => {
+app.post('/api/materials', requireAdmin, async (req, res, next) => {
   try {
     const saved = await db.saveMaterials(req.body);
     res.json(saved);
@@ -409,7 +408,7 @@ app.get('/api/bonuses', async (req, res, next) => {
   }
 });
 
-app.post('/api/bonuses', async (req, res, next) => {
+app.post('/api/bonuses', requireAdmin, async (req, res, next) => {
   try {
     const saved = await db.saveBonuses(req.body);
     res.json(saved);
@@ -428,7 +427,7 @@ app.get('/api/faq', async (req, res, next) => {
   }
 });
 
-app.post('/api/faq', async (req, res, next) => {
+app.post('/api/faq', requireAdmin, async (req, res, next) => {
   try {
     const saved = await db.saveFAQ(req.body);
     res.json(saved);
@@ -447,7 +446,7 @@ app.get('/api/testimonials', async (req, res, next) => {
   }
 });
 
-app.post('/api/testimonials', async (req, res, next) => {
+app.post('/api/testimonials', requireAdmin, async (req, res, next) => {
   try {
     const saved = await db.saveTestimonials(req.body);
     res.json(saved);
@@ -457,7 +456,7 @@ app.post('/api/testimonials', async (req, res, next) => {
 });
 
 // 10. Progress Tracking
-app.get('/api/progress', async (req, res, next) => {
+app.get('/api/progress', requireAdmin, async (req, res, next) => {
   try {
     const progress = await db.getProgress();
     res.json(progress);
@@ -505,7 +504,7 @@ app.post('/api/cta/click', async (req, res, next) => {
 });
 
 // 11b. Leads Management
-app.get('/api/leads', async (req, res, next) => {
+app.get('/api/leads', requireAdmin, async (req, res, next) => {
   try {
     const leads = await db.getLeads();
     res.json(leads);
@@ -514,7 +513,7 @@ app.get('/api/leads', async (req, res, next) => {
   }
 });
 
-app.delete('/api/leads/:id', async (req, res, next) => {
+app.delete('/api/leads/:id', requireAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
     await db.deleteLead(id);
@@ -524,7 +523,7 @@ app.delete('/api/leads/:id', async (req, res, next) => {
   }
 });
 
-app.post('/api/leads/delete', async (req, res, next) => {
+app.post('/api/leads/delete', requireAdmin, async (req, res, next) => {
   try {
     const { id, email } = req.body || {};
     await db.deleteLead(id || '', email || '');
@@ -534,7 +533,7 @@ app.post('/api/leads/delete', async (req, res, next) => {
   }
 });
 
-app.post('/api/leads/toggle-cta', async (req, res, next) => {
+app.post('/api/leads/toggle-cta', requireAdmin, async (req, res, next) => {
   try {
     const { id, email, clickedCta } = req.body || {};
     const success = await db.toggleLeadCta(id, email, clickedCta);
@@ -545,7 +544,7 @@ app.post('/api/leads/toggle-cta', async (req, res, next) => {
 });
 
 // 12. Test Webhook
-app.post('/api/test-webhook', async (req, res, next) => {
+app.post('/api/test-webhook', requireAdmin, async (req, res, next) => {
   try {
     const { webhookUrl } = req.body;
     if (!webhookUrl) return res.status(400).json({ error: 'URL do webhook é obrigatória' });

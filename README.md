@@ -22,17 +22,26 @@ O código já está neste repositório. Toda alteração enviada para a branch `
 
 ---
 
-## 🔐 Como Acessar o Painel Administrativo no Ar
+## 🗄️ Banco de dados (Supabase)
 
-Assim que o projeto estiver publicado na Vercel (ou em qualquer dispositivo/celular):
+Tudo (configurações, leads, progresso, comentários, dúvidas e administradores) fica salvo no Supabase.
 
-1. Basta adicionar **`?admin=true`** ou **`?adm=1`** no final do seu link de produção na barra do navegador.
-   - *Exemplo:* `https://seu-webinar.vercel.app/?admin=true`
-2. Digite a senha administrativa para entrar no painel. Defina a senha na Vercel em **Settings → Environment Variables → `ADMIN_PASSCODE`** (padrão de desenvolvimento: `beconfident@2026`).
-3. O webhook de leads (Make/Zapier/n8n) é configurado no painel, na aba **Vídeo & Smart CTA**.
+1. Crie um projeto em [supabase.com](https://supabase.com).
+2. Abra **SQL Editor → New query**, cole o conteúdo de [`supabase/schema.sql`](supabase/schema.sql) e clique em **Run**. Isso cria as tabelas e cadastra o primeiro administrador.
+3. Em **Authentication → Users → Add user → Create new user**, crie o usuário do primeiro administrador (mesmo e-mail do `schema.sql`) com uma senha e marque **Auto Confirm User**.
+4. Em **Project Settings → API**, copie a *Project URL*, a chave *anon public* e a chave *service_role*.
+5. Na Vercel, em **Settings → Environment Variables**, crie:
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+6. Faça um novo deploy (**Deployments → ⋯ → Redeploy**).
 
----
+## 🔐 Painel Administrativo
+
+- Acesse `https://SEU-SITE.vercel.app/?admin=true` e entre com **e-mail e senha** de administrador.
+- Na aba **Administradores** você adiciona ou remove quem pode entrar no painel.
+- O webhook de leads (Make/Zapier/n8n) é configurado na aba **Vídeo & Smart CTA**.
 
 ## 🛠️ Recursos Incluídos para Vercel
 - **`vercel.json`**: Configurado para rotear chamadas de API (`/api/*`) diretamente para as Serverless Functions (`/api/index.ts`).
-- **Persistência de Dados**: Todas as configurações, bônus, materiais, dados de inscritos e progresso do aluno são gerenciados automaticamente pelo backend.
+- **Persistência de Dados**: configurações, bônus, materiais, inscritos e progresso ficam no Supabase (sem Supabase, em desenvolvimento local, o servidor usa `data/db.json`).
