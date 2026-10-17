@@ -166,3 +166,55 @@ export interface LiveAnalyticsMapData {
   viewers: GeoViewer[];
   timestamp: string;
 }
+
+// ===== Webinars (salas) =====
+export type WebinarType = 'unico' | 'jit';
+
+export interface Webinar {
+  id: string;
+  type: WebinarType;
+  name: string;          // nome interno (só admins veem)
+  title: string;         // título mostrado na sala
+  slug: string;          // final do link: /w/<slug>
+  description?: string;
+  videoUrl: string;
+  startAt?: string;      // ISO — início da sessão (único)
+  durationMinutes?: number;
+  endAt?: string;        // ISO — calculado: início + duração
+  isActive: boolean;     // pausar/despausar sem apagar
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// ===== Atendimento (suporte individual em tempo real) =====
+export interface SupportMessage {
+  id: string;
+  from: 'lead' | 'agent';
+  name: string;
+  text: string;
+  at: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  kind: 'ticket';
+  webinarId: string;
+  leadEmail: string;
+  leadName: string;
+  status: 'open' | 'assigned' | 'closed';
+  assignedTo?: string;
+  closedBy?: string;
+  dismissed?: boolean;
+  messages: SupportMessage[];
+  unreadForAgent?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SupportRoom {
+  webinar: Webinar;
+  live: boolean;
+  viewers: number;
+  agents: number;
+  waiting: number;
+}

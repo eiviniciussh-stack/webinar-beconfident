@@ -5,6 +5,8 @@ import WebinarScreen from './components/WebinarScreen';
 import AdminScreen from './components/AdminScreen';
 import { Settings, User, SyncComment, FAQItem, Bonus, Testimonial, Material } from './types';
 import { Monitor, RefreshCw } from 'lucide-react';
+import { roomSlugFromLocation, setRoomId } from './room';
+import { Webinar } from './types';
 
 const FALLBACK_SETTINGS: Settings = {
   logoText: "Webinar BeConfident",
@@ -71,6 +73,38 @@ function AppContent() {
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [syncComments, setSyncComments] = useState<SyncComment[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(false);
+  const roomSlug = roomSlugFromLocation();
+  const [roomWebinar, setRoomWebinar] = useState<Webinar | null>(null);
+  const [roomError, setRoomError] = useState(false);
+
+  // Rooms created in "Webinars" live at /w/<slug> and override title, video and schedule
+  useEffect(() => {
+    if (!roomSlug) return;
+    const load = () =>
+      fetch(`/api/webinars/public/${roomSlug}`)
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((w: Webinar) => {
+          setRoomWebinar(w);
+          setRoomId(w.id);
+          setRoomError(false);
+        })
+        .catch(() => setRoomError(true));
+    load();
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
+  }, [roomSlug]);
+
+  const effectiveSettings: Settings = roomWebinar
+    ? {
+        ...settings,
+        title: roomWebinar.title || settings.title,
+        description: roomWebinar.description || settings.description,
+        videoUrl: roomWebinar.videoUrl || settings.videoUrl,
+        isScheduled: true,
+        scheduledDateTime: roomWebinar.startAt,
+        isLiveActive: !roomWebinar.endAt || Date.now() <= new Date(roomWebinar.endAt).getTime(),
+      }
+    : settings;
 
   const toast = useToast();
 
@@ -199,7 +233,16 @@ function AppContent() {
     toast.info('Sessão encerrada', 'Você saiu da sala do webinar com sucesso.');
   };
 
-  if (isInitialLoading || !settings) {
+  if (roomSlug && roomError && currentScreen !== 'admin') {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#F2EBFF] text-[#20044E] font-sans px-6 text-center">
+        <h1 className="text-2xl font-semibold mb-2">Webinar não encontrado</h1>
+        <p className="text-[#706680] max-w-md">Este link não existe ou o webinar foi pausado. Confira o endereço que você recebeu.</p>
+      </div>
+    );
+  }
+
+  if (isInitialLoading || !settings || (roomSlug && !roomWebinar && currentScreen !== 'admin')) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#140B26] text-zinc-100 font-sans">
         <div className="flex flex-col items-center gap-4">
@@ -216,7 +259,7 @@ function AppContent() {
     <div className={`min-h-screen overflow-x-hidden transition-colors duration-300 ${currentScreen === 'webinar' || currentScreen === 'login' ? 'bg-white' : 'bg-[#140B26]'}`}>
       {currentScreen === 'login' && (
         <LoginScreen
-          settings={settings}
+          settings={effectiveSettings}
           onLoginSuccess={handleLoginSuccess}
           onAdminClick={() => setCurrentScreen('admin')}
         />
@@ -231,7 +274,7 @@ function AppContent() {
             createdAt: new Date().toISOString(),
             role: 'user'
           }}
-          settings={settings || FALLBACK_SETTINGS}
+          settings={effectiveSettings || FALLBACK_SETTINGS}
           faq={faq}
           bonuses={bonuses}
           testimonials={testimonials}
