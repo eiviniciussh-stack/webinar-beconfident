@@ -1,6 +1,11 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const url = process.env.SUPABASE_URL || '';
+// Accept the URL in any common form (with trailing slash or the /rest/v1 suffix copied from the dashboard)
+const url = (process.env.SUPABASE_URL || '')
+  .trim()
+  .replace(/\/+$/, '')
+  .replace(/\/(rest|auth)\/v1$/, '')
+  .replace(/\/+$/, '');
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const anonKey = process.env.SUPABASE_ANON_KEY || '';
 
