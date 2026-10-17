@@ -1,0 +1,205 @@
+{
+  "settings": {
+    "logoText": "Webinar BeConfident",
+    "title": "Descubra como falar inglês com confiança em poucas semanas.",
+    "description": "Uma aula exclusiva da BeConfident sobre o método que combina Masters e mentores de IA para destravar sua conversação.",
+    "videoUrl": "https://www.youtube.com/watch?v=tHuwcSRj9ms",
+    "ctaType": "time",
+    "ctaTriggerValue": 30,
+    "ctaText": "Agende uma conversa e descubra o plano ideal para você destravar o inglês.",
+    "ctaLink": "https://beconfident.app",
+    "primaryColor": "#8134FE",
+    "secondaryColor": "#20044E",
+    "offerDuration": 600,
+    "liveMinUsers": 20,
+    "liveMaxUsers": 35,
+    "offerTitle": "Comece hoje na BeConfident",
+    "offerBtnText": "QUERO COMEÇAR",
+    "tabOfferTitle": "Comece hoje na BeConfident",
+    "tabOfferSubtitle": "Agende uma conversa e descubra o plano ideal para você destravar o inglês.",
+    "tabOfferDescription": "✓ Aulas com Masters e mentores de IA\n✓ Pratique no WhatsApp e no App\n✓ Plano adaptado aos seus objetivos",
+    "webhookUrl": "",
+    "webhookEnabled": false,
+    "isLiveActive": true,
+    "highlightText": "falar inglês com confiança",
+    "badgeText": "Aula online e gratuita"
+  },
+  "users": [],
+  "comments": [
+    {
+      "id": "c1",
+      "time": 10,
+      "name": "Carlos Silva",
+      "photoUrl": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80",
+      "message": "Boa noite pessoal! Animado demais para começar."
+    },
+    {
+      "id": "c2",
+      "time": 25,
+      "name": "Patricia Souza",
+      "photoUrl": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80",
+      "message": "O áudio e o vídeo estão ótimos por aqui!"
+    },
+    {
+      "id": "c3",
+      "time": 45,
+      "name": "Marcos Oliveira",
+      "photoUrl": "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&h=150&q=80",
+      "message": "Essa introdução já valeu meu tempo inteiro!"
+    },
+    {
+      "id": "c4",
+      "time": 70,
+      "name": "Renata Costa",
+      "photoUrl": "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&h=150&q=80",
+      "message": "Trabalho com isso há meses e nunca vi essa abordagem. Sensacional."
+    },
+    {
+      "id": "c5",
+      "time": 110,
+      "name": "Juliano Neto",
+      "photoUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80",
+      "message": "Estou anotando absolutamente tudo. Conteúdo absurdo de bom."
+    },
+    {
+      "id": "c6",
+      "time": 150,
+      "name": "Fernanda Dias",
+      "photoUrl": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&h=150&q=80",
+      "message": "Qual o link dos materiais que você comentou na introdução?"
+    },
+    {
+      "id": "c7",
+      "time": 190,
+      "name": "Diego Almeida",
+      "photoUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80",
+      "message": "A planilha de métricas na aba Materiais é fantástica!"
+    },
+    {
+      "id": "c8",
+      "time": 240,
+      "name": "Thiago Rocha",
+      "photoUrl": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=150&h=150&q=80",
+      "message": "Didática perfeita. Muito direto ao ponto."
+    },
+    {
+      "id": "c9",
+      "time": 290,
+      "name": "Sabrina Luz",
+      "photoUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80",
+      "message": "Nossa, isso resolve um gargalo enorme que eu tinha aqui."
+    }
+  ],
+  "questions": [],
+  "materials": [
+    {
+      "id": "m1",
+      "title": "Mapa Mental: Estrutura de Lançamento de Alta Conversão",
+      "type": "PDF",
+      "url": "#",
+      "description": "O guia visual completo dos 3 pilares do webinar de vendas."
+    },
+    {
+      "id": "m2",
+      "title": "Planilha de Planejamento de Métricas Financeiras",
+      "type": "Planilha",
+      "url": "#",
+      "description": "Calcule seu ROI, custo por lead e faturamento estimado."
+    },
+    {
+      "id": "m3",
+      "title": "Checklist do Setup de Webinar Perfeito",
+      "type": "Checklist",
+      "url": "#",
+      "description": "Não comece seu webinar sem antes marcar todos estes itens de segurança."
+    },
+    {
+      "id": "m4",
+      "title": "Acesso ao Nosso Grupo VIP de Network",
+      "type": "Link",
+      "url": "https://telegram.org",
+      "description": "Entre no canal e conecte-se com outros players do mercado."
+    }
+  ],
+  "bonuses": [
+    {
+      "id": "b1",
+      "title": "Comunidade VIP Secreta de Alunos",
+      "description": "Faça networking com os maiores players do mercado, feche parcerias e acelere seu aprendizado em um ecossistema focado em resultados.",
+      "value": "R$ 997",
+      "imageUrl": "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=400&h=250&q=80"
+    },
+    {
+      "id": "b2",
+      "title": "Sessões Mensais de Mentoria Ao Vivo",
+      "description": "Participe de chamadas em grupo mensais via Zoom diretamente com nossa equipe para tirar suas dúvidas de implementação e receber feedbacks.",
+      "value": "R$ 1.997",
+      "imageUrl": "https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&w=400&h=250&q=80"
+    },
+    {
+      "id": "b3",
+      "title": "Biblioteca Secreta de Templates de Alta Conversão",
+      "description": "Copie e cole nossos modelos de páginas de captura, páginas de vendas, criativos de anúncios e sequências completas de emails.",
+      "value": "R$ 497",
+      "imageUrl": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=400&h=250&q=80"
+    }
+  ],
+  "faq": [
+    {
+      "id": "f1",
+      "question": "Como recebo o acesso ao treinamento completo?",
+      "answer": "O acesso é 100% imediato! Logo após a confirmação do pagamento, você receberá um e-mail com seus dados de login e senha para acessar nossa área de membros exclusiva.",
+      "order": 1
+    },
+    {
+      "id": "f2",
+      "question": "Quais são as formas de pagamento disponíveis?",
+      "answer": "Você pode realizar o pagamento via Pix (com aprovação imediata), cartão de crédito em até 12 parcelas (podendo usar dois cartões se preferir), ou boleto bancário.",
+      "order": 2
+    },
+    {
+      "id": "f3",
+      "question": "Como funciona a garantia incondicional de 7 dias?",
+      "answer": "Temos tanta confiança no nosso método que oferecemos uma Garantia Blindada de 7 dias. Se você entrar e achar que não é para você, basta enviar um e-mail ao nosso suporte dentro do prazo e devolvemos 100% do seu investimento, sem perguntas ou burocracia.",
+      "order": 3
+    },
+    {
+      "id": "f4",
+      "question": "Por quanto tempo terei acesso ao material gravado e bônus?",
+      "answer": "O acesso à gravação deste webinar e a todos os bônus oferecidos hoje é vitalício! Você poderá assistir no seu próprio ritmo, quantas vezes desejar.",
+      "order": 4
+    },
+    {
+      "id": "f5",
+      "question": "Eu preciso ter experiência prévia ou produtos prontos?",
+      "answer": "Não! O método foi estruturado para levar você do absoluto zero até os primeiros resultados. Ensinamos como escolher nicho, criar ofertas e atrair público qualificado.",
+      "order": 5
+    }
+  ],
+  "testimonials": [
+    {
+      "id": "t1",
+      "name": "Aline Torres",
+      "photoUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80",
+      "rating": 5,
+      "text": "Esse webinar mudou totalmente o rumo do meu negócio digital. Em menos de 30 dias aplicando as técnicas de retenção e roteiro de vendas, consegui duplicar minhas conversões de mentoria."
+    },
+    {
+      "id": "t2",
+      "name": "Felipe Silveira",
+      "photoUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80",
+      "rating": 5,
+      "text": "Já comprei cursos de R$ 2.000 que não entregaram metade do valor prático que esse webinar gratuito forneceu. A didática é incrível e o passo a passo é extremamente acionável."
+    },
+    {
+      "id": "t3",
+      "name": "Gabriela Mendes",
+      "photoUrl": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80",
+      "rating": 5,
+      "text": "Sem enrolação, direto ao ponto e com dados reais. Fiquei presa na tela do início ao fim. O suporte é maravilhoso e as planilhas extras ajudaram demais a organizar meu funil."
+    }
+  ],
+  "progress": [],
+  "ctaClicks": 0,
+  "realComments": []
+}

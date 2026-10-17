@@ -1,0 +1,167 @@
+@import url('https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "leaflet/dist/leaflet.css";
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Rethink Sans", ui-sans-serif, system-ui, sans-serif;
+
+  /* ===== BeConfident brand ===== */
+  --color-brand: #8134FE;
+  --color-brand-dark: #20044E;
+  --color-brand-deep: #2D1461;
+  --color-brand-soft: #F2EBFF;
+  --color-brand-muted: #706680;
+
+  /* Remap legacy accent scales (emerald / indigo) to BeConfident purple */
+  --color-emerald-50: #F7F2FF;
+  --color-emerald-100: #F2EBFF;
+  --color-emerald-200: #E2D3FE;
+  --color-emerald-300: #D0BAFD;
+  --color-emerald-400: #AE88FB;
+  --color-emerald-500: #8134FE;
+  --color-emerald-600: #7E2EFF;
+  --color-emerald-700: #6419DB;
+  --color-emerald-800: #4A12A6;
+  --color-emerald-900: #2D1461;
+  --color-emerald-950: #20044E;
+  --color-indigo-50: #F7F2FF;
+  --color-indigo-100: #F2EBFF;
+  --color-indigo-200: #E2D3FE;
+  --color-indigo-300: #D0BAFD;
+  --color-indigo-400: #AE88FB;
+  --color-indigo-500: #8134FE;
+  --color-indigo-600: #7E2EFF;
+  --color-indigo-700: #6419DB;
+  --color-indigo-800: #4A12A6;
+  --color-indigo-900: #2D1461;
+  --color-indigo-950: #20044E;
+
+  /* Neutrals tinted with BeConfident purple */
+  --color-zinc-50: #FAF8FF;
+  --color-zinc-100: #F2EEFA;
+  --color-zinc-200: #E6E0F0;
+  --color-zinc-300: #CDC4DB;
+  --color-zinc-400: #A49BB5;
+  --color-zinc-500: #8A8199;
+  --color-zinc-600: #706680;
+  --color-zinc-700: #463B5C;
+  --color-zinc-800: #2E2346;
+  --color-zinc-900: #1E1533;
+  --color-zinc-950: #140B26;
+
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Custom Scrollbar Styles for elegant UI */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #2E2346;
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #463B5C;
+}
+
+/* Leaflet Dark Map Overrides */
+.leaflet-container {
+  background: #140B26 !important;
+  font-family: inherit;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.leaflet-div-icon,
+.custom-radar-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.leaflet-control-zoom {
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+}
+
+.leaflet-control-zoom a {
+  background-color: #1E1533 !important;
+  color: #A49BB5 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: #2E2346 !important;
+  color: #8134FE !important;
+}
+
+.leaflet-popup-content-wrapper {
+  background: #1E1533 !important;
+  color: #F2EEFA !important;
+  border: 1px solid rgba(129, 52, 254, 0.3) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.8), 0 0 15px rgba(129, 52, 254, 0.15) !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-tip {
+  background: #1E1533 !important;
+  border: 1px solid rgba(129, 52, 254, 0.3) !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  line-height: 1.4 !important;
+}
+
+/* Radar & Pulsing Green Dots for Map */
+@keyframes radarPulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(2.4);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(3.5);
+    opacity: 0;
+  }
+}
+
+.radar-ping {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  margin-left: -7px;
+  border-radius: 50%;
+  background: rgba(129, 52, 254, 0.7);
+  animation: radarPulse 2.5s infinite ease-out;
+}
+
+.radar-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: #8134FE;
+  box-shadow: 0 0 10px #8134FE, 0 0 20px rgba(129, 52, 254, 0.6);
+  border: 1.5px solid #ffffff;
+}
+
+
+
+body { background: #F7F3FF; color: #20044E; }
+::selection { background: #D0BAFD; color: #20044E; }
