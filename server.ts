@@ -4,6 +4,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { db } from './server/db.js';
 import { registerAuthRoutes, requireAdmin, getAdminEmail } from './server/auth.js';
+import { registerSupportRoutes } from './server/support.js';
 import { WebinarStats } from './src/types.js';
 
 const app = express();
@@ -93,6 +94,7 @@ app.use('/api', async (req, _res, next) => {
 });
 
 registerAuthRoutes(app);
+registerSupportRoutes(app);
 
 // 0. DB Status
 app.get('/api/db-status', requireAdmin, async (req, res, next) => {
@@ -211,10 +213,10 @@ app.post('/api/users/login', async (req, res, next) => {
 // Ping route for live attendance calculation
 app.post('/api/ping', async (req, res, next) => {
   try {
-    const { email, name, device } = req.body || {};
+    const { email, name, device, webinarId } = req.body || {};
     const clientIp = getClientIp(req);
     const userDevice = parseUserDevice(req.headers['user-agent'], device);
-    const resPing = await db.pingUser(email || '', name || '', userDevice, clientIp);
+    const resPing = await db.pingUser(email || '', name || '', userDevice, clientIp, webinarId ? String(webinarId) : undefined);
     res.json({ status: 'ok', onlineNow: resPing.onlineNow });
   } catch (err) {
     next(err);
