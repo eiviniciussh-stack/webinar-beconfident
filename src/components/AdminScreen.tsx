@@ -6,11 +6,12 @@ import {
   ArrowLeft, CheckCircle2, RefreshCw, Star, ArrowUpRight, Check, CheckSquare, Calendar,
   Activity, AlertTriangle, Terminal, XCircle, Info, Database,
   UserCheck, Clock, MousePointerClick, Search, Download, TrendingUp, UserPlus, ExternalLink, Filter,
-  Radio, Send, MessageSquare, Phone, Smartphone, Laptop, Tablet, Globe, MapPin, Zap, LogOut, ShieldCheck
+  Radio, Send, MessageSquare, Phone, Smartphone, Laptop, Tablet, Globe, MapPin, Zap, LogOut, ShieldCheck, LayoutDashboard, Video, UserCog, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useToast } from './Toast';
 import { BeConfidentMark } from './BrandHeader';
 import AdminUsersPanel from './AdminUsersPanel';
+import DashboardPanel from './DashboardPanel';
 import * as adminAuth from '../adminAuth';
 import { 
   Settings as AppSettings, SyncComment, FAQItem, Bonus, 
@@ -101,7 +102,8 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
   const [loginPassword, setLoginPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!adminAuth.getSession());
-  const [activeTab, setActiveTab] = useState<'stats' | 'leads' | 'webinar' | 'questions' | 'users' | 'content' | 'admins'>('stats');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'leads' | 'webinar' | 'questions' | 'users' | 'content' | 'admins'>('dashboard');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [dbStatus, setDbStatus] = useState<{ status: string; storage: string } | null>(null);
 
@@ -536,7 +538,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
       logs.push({
         step: '1. Leitura do Status do Banco (/api/db-status)',
         status: 'success',
-        details: `Conectado ao servidor! Armazenamento Local JSON (Persistência Ativa no Servidor Node.js).`,
+        details: `Conectado ao servidor! Armazenamento: ${statusRes?.storage || "banco de dados"}.`,
         latencyMs: Math.round(t1 - t0)
       });
     } catch (err: any) {
@@ -937,8 +939,8 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
 
   if (!isAuthenticated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#140B26] text-zinc-100 font-sans px-4 select-none">
-        <div className="w-full max-w-sm bg-[#1E1533] border border-zinc-800 rounded-2xl p-6 shadow-2xl">
+      <div className="admin-light flex min-h-screen items-center justify-center bg-[#F7F5FB] text-zinc-100 font-sans px-4 select-none">
+        <div className="w-full max-w-sm bg-[#FFFFFF] border border-zinc-800 rounded-2xl p-6 shadow-2xl">
           <div className="text-center mb-6">
             <div className="flex justify-center mb-3"><BeConfidentMark size={52} /></div>
             <h2 className="text-xl font-bold">Acesso Restrito</h2>
@@ -994,24 +996,110 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
     );
   }
 
+  const NAV: { id: typeof activeTab; label: string; icon: React.ReactNode }[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
+    { id: 'leads', label: 'Leads', icon: <UserCheck className="h-[18px] w-[18px]" /> },
+    { id: 'webinar', label: 'Vídeos', icon: <Video className="h-[18px] w-[18px]" /> },
+    { id: 'questions', label: 'Sala ao vivo', icon: <Radio className="h-[18px] w-[18px]" /> },
+    { id: 'users', label: 'Progresso dos alunos', icon: <TrendingUp className="h-[18px] w-[18px]" /> },
+    { id: 'content', label: 'Conteúdos da sala', icon: <MessageSquareCode className="h-[18px] w-[18px]" /> },
+    { id: 'admins', label: 'Usuários', icon: <UserCog className="h-[18px] w-[18px]" /> },
+  ];
+  const PAGE_TITLES: Record<string, string> = {
+    dashboard: 'Dashboard geral',
+    leads: 'Leads',
+    webinar: 'Vídeos',
+    questions: 'Sala ao vivo',
+    users: 'Progresso dos alunos',
+    content: 'Conteúdos da sala',
+    admins: 'Usuários',
+  };
+
   return (
-    <div className="min-h-screen bg-[#140B26] text-zinc-100 font-sans select-none">
-      {/* Top Header bar */}
-      <header className="sticky top-0 z-40 w-full border-b border-white/5 bg-[#140B26]/90 backdrop-blur-md px-6 py-4 flex justify-between items-center max-w-7xl mx-auto">
-        <div className="flex items-center gap-3">
+    <div className="admin-light min-h-screen font-sans select-none lg:flex">
+      {/* Left sidebar */}
+      <aside
+        className={`hidden lg:flex flex-col shrink-0 sticky top-0 h-screen border-r transition-all duration-200 ${sidebarCollapsed ? 'w-[76px]' : 'w-[248px]'}`}
+        style={{ background: '#FFFFFF', borderColor: '#ECE7F5' }}
+      >
+        <div className="flex items-center justify-between gap-2 px-4 pt-5 pb-6">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <BeConfidentMark size={36} />
+            {!sidebarCollapsed && (
+              <span className="flex flex-col leading-tight min-w-0">
+                <span className="text-[15px] font-semibold truncate" style={{ color: '#20044E' }}>BeConfident</span>
+                <span className="text-[11px] truncate" style={{ color: '#8A8199' }}>Webinar</span>
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => setSidebarCollapsed((v) => !v)}
+            title={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
+            className="w-7 h-7 rounded-full border flex items-center justify-center cursor-pointer shrink-0 hover:opacity-80"
+            style={{ borderColor: '#ECE7F5', color: '#4A4060', background: '#FFFFFF' }}
+          >
+            {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </button>
+        </div>
+        <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
+          {NAV.map((item) => {
+            const active = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                title={item.label}
+                className={`w-full flex items-center gap-3 rounded-xl text-sm font-medium transition-colors cursor-pointer ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'}`}
+                style={active ? { background: '#F2EBFF', color: '#6419DB' } : { color: '#4A4060' }}
+                onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = '#F7F5FB'; }}
+                onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <span style={{ color: active ? '#7E2EFF' : '#8A8199' }}>{item.icon}</span>
+                {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                {!sidebarCollapsed && item.id === 'leads' && leads.length > 0 && (
+                  <span className="ml-auto text-[11px] font-semibold px-1.5 py-0.5 rounded-md" style={{ background: '#F2EBFF', color: '#6419DB' }}>{leads.length}</span>
+                )}
+                {!sidebarCollapsed && item.id === 'questions' && settings.isLiveActive !== false && (
+                  <span className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                )}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="px-3 py-4 border-t" style={{ borderColor: '#ECE7F5' }}>
           <button
             onClick={onBack}
-            className="p-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white rounded-lg transition-all cursor-pointer"
+            title="Ver a sala do webinar"
+            className={`w-full flex items-center gap-3 rounded-xl text-sm font-medium cursor-pointer hover:opacity-80 ${sidebarCollapsed ? 'justify-center py-2.5' : 'px-3 py-2.5'}`}
+            style={{ color: '#4A4060' }}
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ExternalLink className="h-[18px] w-[18px]" style={{ color: '#8A8199' }} />
+            {!sidebarCollapsed && 'Ver sala do webinar'}
           </button>
-          <BeConfidentMark size={40} />
-          <span className="flex flex-col leading-tight">
-            <span className="text-sm font-semibold text-white tracking-tight">BeConfident</span>
-            <span className="text-[11px] text-[#AE88FB] font-medium">Painel do webinar</span>
-          </span>
         </div>
+      </aside>
 
+      <div className="flex-1 min-w-0">
+      {/* Mobile menu (horizontal) */}
+      <div className="lg:hidden sticky top-0 z-40 border-b px-4 py-3 flex items-center gap-3 overflow-x-auto" style={{ background: '#FFFFFF', borderColor: '#ECE7F5' }}>
+        <BeConfidentMark size={32} />
+        {NAV.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id)}
+            className="shrink-0 px-3 py-2 rounded-xl text-sm font-medium cursor-pointer"
+            style={activeTab === item.id ? { background: '#F2EBFF', color: '#6419DB' } : { color: '#4A4060' }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Page header */}
+      <header className="px-4 sm:px-8 pt-6 pb-2 flex flex-wrap justify-between items-center gap-3">
+        <h1 className="text-2xl sm:text-[28px] font-semibold tracking-tight" style={{ color: '#20044E' }}>
+          {PAGE_TITLES[activeTab] || 'Painel'}
+        </h1>
         <div className="flex items-center gap-2">
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-zinc-950 border border-zinc-800 rounded-lg text-[11px] font-mono text-zinc-400">
             <Database className="h-3 w-3 text-emerald-400" />
@@ -1022,7 +1110,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
               setShowDiagnosticPanel(true);
               runDiagnosticCheck();
             }}
-            className="px-3 py-1.5 bg-[#8134FE]/10 hover:bg-[#8134FE]/20 border border-[#8134FE]/40 text-[#D0BAFD] font-medium rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 text-xs"
+            className="px-3 py-1.5 bg-[#8134FE]/10 hover:bg-[#8134FE]/20 border border-[#8134FE]/40 text-[#6419DB] font-medium rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 text-xs"
           >
             <Activity className="h-3.5 w-3.5" />
             <span>Diagnóstico API</span>
@@ -1045,7 +1133,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
+      <main className="px-4 sm:px-8 py-4 lg:py-6 max-w-[1500px]">
         
         {/* Diagnostic Error Banner if an error occurred on save */}
         {diagnosticError && (
@@ -1110,7 +1198,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className="w-full max-w-2xl bg-[#20044E] border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-5 text-slate-200 font-sans max-h-[90vh] overflow-y-auto"
+                className="w-full max-w-2xl bg-[#F2EBFF] border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-5 text-slate-200 font-sans max-h-[90vh] overflow-y-auto"
               >
                 <div className="flex justify-between items-center border-b border-slate-800 pb-4">
                   <div className="flex items-center gap-3">
@@ -1135,7 +1223,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
                   <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1">
                     <span className="text-slate-400">Modo de Armazenamento:</span>
                     <p className="text-sm font-bold text-emerald-400">
-                      💾 Banco de Dados Integrado (Express + Local JSON)
+                      💾 {dbStatus?.storage || "Banco de dados"}
                     </p>
                   </div>
                   <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1">
@@ -1211,367 +1299,10 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
           )}
         </AnimatePresence>
         
-        {/* Navigation Sidebar Tabs */}
-        <div className="flex flex-wrap gap-1.5 mb-8 p-1.5 bg-white/[0.04] border border-white/5 rounded-2xl w-fit max-w-full">
-          <button
-            onClick={() => setActiveTab('stats')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition-all cursor-pointer ${
-              activeTab === 'stats'
-                ? 'bg-[#7E2EFF] text-white border-transparent shadow-[0_8px_20px_-8px_rgba(126,46,255,0.8)] [&_svg]:!text-white'
-                : 'text-zinc-400 hover:text-white hover:bg-white/5 border-transparent'
-            }`}
-          >
-            <BarChart3 className="h-4 w-4 text-emerald-400" />
-            Estatísticas Gerais
-          </button>
-
-          <button
-            onClick={() => setActiveTab('leads')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition-all cursor-pointer ${
-              activeTab === 'leads'
-                ? 'bg-[#7E2EFF] text-white border-transparent shadow-[0_8px_20px_-8px_rgba(126,46,255,0.8)] [&_svg]:!text-white'
-                : 'text-zinc-400 hover:text-white hover:bg-white/5 border-transparent'
-            }`}
-          >
-            <UserCheck className="h-4 w-4 text-emerald-400" />
-            Leads & Retenção
-            {leads.length > 0 && (
-              <span className="px-2 py-0.5 text-[10px] bg-emerald-500/20 text-emerald-300 font-mono rounded-full font-bold">
-                {leads.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('webinar')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition-all cursor-pointer ${
-              activeTab === 'webinar'
-                ? 'bg-[#7E2EFF] text-white border-transparent shadow-[0_8px_20px_-8px_rgba(126,46,255,0.8)] [&_svg]:!text-white'
-                : 'text-zinc-400 hover:text-white hover:bg-white/5 border-transparent'
-            }`}
-          >
-            <Settings className="h-4 w-4 text-sky-400" />
-            Vídeo & Smart CTA
-          </button>
-
-          <button
-            onClick={() => setActiveTab('questions')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition-all cursor-pointer ${
-              activeTab === 'questions'
-                ? 'bg-red-950/40 text-white border-red-800/80 shadow-md shadow-red-950/20'
-                : 'text-zinc-400 hover:text-white hover:bg-white/5 border-transparent'
-            }`}
-          >
-            <Radio className="h-4 w-4 text-red-500 animate-pulse shrink-0" />
-            <span className="font-bold">Ao Vivo</span>
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-            </span>
-            {questions.filter(q => !q.answered).length > 0 && (
-              <span className="px-1.5 py-0.2 text-[10px] bg-red-500/20 text-red-300 font-mono rounded font-bold">
-                {questions.filter(q => !q.answered).length}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition-all cursor-pointer ${
-              activeTab === 'users'
-                ? 'bg-[#7E2EFF] text-white border-transparent shadow-[0_8px_20px_-8px_rgba(126,46,255,0.8)] [&_svg]:!text-white'
-                : 'text-zinc-400 hover:text-white hover:bg-white/5 border-transparent'
-            }`}
-          >
-            <Users className="h-4 w-4 text-indigo-400" />
-            Progresso de Alunos
-          </button>
-
-          <button
-            onClick={() => setActiveTab('content')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition-all cursor-pointer ${
-              activeTab === 'content'
-                ? 'bg-[#7E2EFF] text-white border-transparent shadow-[0_8px_20px_-8px_rgba(126,46,255,0.8)] [&_svg]:!text-white'
-                : 'text-zinc-400 hover:text-white hover:bg-white/5 border-transparent'
-            }`}
-          >
-            <MessageSquareCode className="h-4 w-4 text-amber-400" />
-            Conteúdos da Sala
-          </button>
-
-          <button
-            onClick={() => setActiveTab('admins')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition-all cursor-pointer ${
-              activeTab === 'admins'
-                ? 'bg-[#7E2EFF] text-white border-transparent shadow-[0_8px_20px_-8px_rgba(126,46,255,0.8)] [&_svg]:!text-white'
-                : 'text-zinc-400 hover:text-white hover:bg-white/5 border-transparent'
-            }`}
-          >
-            <ShieldCheck className="h-4 w-4 text-[#AE88FB]" />
-            Administradores
-          </button>
-        </div>
-
         {/* Tab Contents */}
         <AnimatePresence mode="wait">
           
-          {/* STATS TAB */}
-          {activeTab === 'stats' && (
-            <motion.div
-              key="stats-panel"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="space-y-6"
-            >
-              {/* Header Banner */}
-              <div className="p-6 bg-gradient-to-r from-zinc-950 via-[#1E1533] to-zinc-950 border border-zinc-800 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
-                      Métricas em Tempo Real
-                    </span>
-                  </div>
-                  <h2 className="text-xl font-bold text-white tracking-tight">Estatísticas Gerais do Webinar</h2>
-                  <p className="text-xs text-zinc-400 mt-1">Acompanhe a retenção, engajamento e taxa de conversão da sua oferta inteligente em tempo real.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setActiveTab('leads')}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs rounded-xl transition-all shadow-lg shadow-emerald-950/40 cursor-pointer"
-                  >
-                    <UserCheck className="h-4 w-4" />
-                    Ver Aba de Leads ({leads.length})
-                  </button>
-                </div>
-              </div>
-
-              {/* 5 Main KPI Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                
-                <div className="p-5 bg-zinc-950/80 border border-zinc-900 rounded-2xl relative overflow-hidden group hover:border-zinc-800 transition-all">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] text-zinc-400 uppercase tracking-wider font-mono">Total de Leads</span>
-                    <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl">
-                      <Users className="h-5 w-5" />
-                    </div>
-                  </div>
-                  <p className="text-2xl sm:text-3xl font-extrabold text-white font-mono">{leads.length || stats.totalUsers}</p>
-                  <p className="text-[11px] text-zinc-500 mt-2 flex items-center gap-1">
-                    <UserPlus className="h-3 w-3 text-emerald-400" />
-                    Alunos cadastrados na sala
-                  </p>
-                </div>
-
-                <div className="p-5 bg-zinc-950/80 border border-zinc-900 rounded-2xl relative overflow-hidden group hover:border-zinc-800 transition-all">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] text-zinc-400 uppercase tracking-wider font-mono">Ao Vivo Agora</span>
-                    <div className="p-2 bg-red-500/10 text-red-400 rounded-xl">
-                      <span className="relative flex h-3.5 w-3.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-red-500" />
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-2xl sm:text-3xl font-extrabold text-white font-mono">{stats.activeUsers}</p>
-                  <p className="text-[11px] text-zinc-500 mt-2 flex items-center gap-1">
-                    <Activity className="h-3 w-3 text-red-400" />
-                    Pessoas conectadas no momento
-                  </p>
-                </div>
-
-                <div className="p-5 bg-zinc-950/80 border border-zinc-900 rounded-2xl relative overflow-hidden group hover:border-zinc-800 transition-all">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] text-zinc-400 uppercase tracking-wider font-mono">Cliques na Oferta</span>
-                    <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl">
-                      <MousePointerClick className="h-5 w-5" />
-                    </div>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <p className="text-2xl sm:text-3xl font-extrabold text-white font-mono">
-                      {leads.filter(l => l.clickedCta).length}
-                    </p>
-                    <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono">
-                      {leads.length > 0 ? ((leads.filter(l => l.clickedCta).length / leads.length) * 100).toFixed(1) : 0}% CTR
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-zinc-500 mt-2">Cliques no botão de compra</p>
-                </div>
-
-                <div className="p-5 bg-zinc-950/80 border border-zinc-900 rounded-2xl relative overflow-hidden group hover:border-zinc-800 transition-all">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] text-zinc-400 uppercase tracking-wider font-mono">Retenção Média</span>
-                    <div className="p-2 bg-amber-500/10 text-amber-400 rounded-xl">
-                      <Clock className="h-5 w-5" />
-                    </div>
-                  </div>
-                  <p className="text-2xl sm:text-3xl font-extrabold text-white font-mono">
-                    {formatSecondsToMMSS(stats.avgWatchTime)}
-                  </p>
-                  <p className="text-[11px] text-zinc-500 mt-2">Tempo médio de permanência</p>
-                </div>
-
-                <div className="p-5 bg-zinc-950/80 border border-zinc-900 rounded-2xl relative overflow-hidden group hover:border-zinc-800 transition-all">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] text-zinc-400 uppercase tracking-wider font-mono">Dúvidas no Chat</span>
-                    <div className="p-2 bg-purple-500/10 text-purple-400 rounded-xl">
-                      <HelpCircle className="h-5 w-5" />
-                    </div>
-                  </div>
-                  <p className="text-2xl sm:text-3xl font-extrabold text-white font-mono">{stats.questionsCount}</p>
-                  <p className="text-[11px] text-zinc-500 mt-2">Perguntas de alunos enviadas</p>
-                </div>
-
-              </div>
-
-              {/* Retenção & Conversão Section */}
-              <div className="p-6 bg-[#1E1533] border border-zinc-800 rounded-2xl space-y-5">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                  <div>
-                    <h3 className="text-base font-bold text-white flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5 text-emerald-400" />
-                      Métricas de Retenção & Conversão
-                    </h3>
-                    <p className="text-xs text-zinc-400">Jornada dos alunos por tempo de aula assistida até o clique na oferta.</p>
-                  </div>
-                  <span className="text-xs font-mono bg-zinc-900 border border-zinc-800 px-3 py-1 rounded-full text-zinc-300">
-                    Conversão na Oferta: <strong className="text-emerald-400">{leads.length > 0 ? ((leads.filter(l => l.clickedCta).length / leads.length) * 100).toFixed(1) : 0}%</strong>
-                  </span>
-                </div>
-
-                <div className="space-y-4 pt-2">
-                  {/* 1. Entraram na sala */}
-                  <div>
-                    <div className="flex justify-between items-center text-xs font-medium text-zinc-300 mb-1.5">
-                      <span className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-[10px] font-bold font-mono">1</span>
-                        Entraram na Sala (Leads Cadastrados)
-                      </span>
-                      <span className="font-mono text-zinc-300 font-bold">{leads.length || stats.totalUsers} alunos (100%)</span>
-                    </div>
-                    <div className="w-full h-3 bg-zinc-900 rounded-full overflow-hidden">
-                      <div className="h-full bg-indigo-500 rounded-full w-full" />
-                    </div>
-                  </div>
-
-                  {/* 2. Assistiram 5 minutos de aula */}
-                  <div>
-                    <div className="flex justify-between items-center text-xs font-medium text-zinc-300 mb-1.5">
-                      <span className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center text-[10px] font-bold font-mono">2</span>
-                        Assistiram 5 minutos de aula (+5m)
-                      </span>
-                      <span className="font-mono text-zinc-300">
-                        {leads.filter(l => l.watchedSeconds >= 300).length} alunos ({leads.length > 0 ? Math.round((leads.filter(l => l.watchedSeconds >= 300).length / leads.length) * 100) : 0}%)
-                      </span>
-                    </div>
-                    <div className="w-full h-3 bg-zinc-900 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-sky-500 rounded-full transition-all duration-500" 
-                        style={{ width: `${leads.length > 0 ? (leads.filter(l => l.watchedSeconds >= 300).length / leads.length) * 100 : 0}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 3. Assistiram 15 minutos de aula */}
-                  <div>
-                    <div className="flex justify-between items-center text-xs font-medium text-zinc-300 mb-1.5">
-                      <span className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-[10px] font-bold font-mono">3</span>
-                        Assistiram 15 minutos de aula (+15m)
-                      </span>
-                      <span className="font-mono text-zinc-300">
-                        {leads.filter(l => l.watchedSeconds >= 900).length} alunos ({leads.length > 0 ? Math.round((leads.filter(l => l.watchedSeconds >= 900).length / leads.length) * 100) : 0}%)
-                      </span>
-                    </div>
-                    <div className="w-full h-3 bg-zinc-900 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-cyan-500 rounded-full transition-all duration-500" 
-                        style={{ width: `${leads.length > 0 ? (leads.filter(l => l.watchedSeconds >= 900).length / leads.length) * 100 : 0}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 4. Assistiram 30 minutos de aula */}
-                  <div>
-                    <div className="flex justify-between items-center text-xs font-medium text-zinc-300 mb-1.5">
-                      <span className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center text-[10px] font-bold font-mono">4</span>
-                        Assistiram 30 minutos de aula (+30m)
-                      </span>
-                      <span className="font-mono text-zinc-300">
-                        {leads.filter(l => l.watchedSeconds >= 1800).length} alunos ({leads.length > 0 ? Math.round((leads.filter(l => l.watchedSeconds >= 1800).length / leads.length) * 100) : 0}%)
-                      </span>
-                    </div>
-                    <div className="w-full h-3 bg-zinc-900 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-teal-500 rounded-full transition-all duration-500" 
-                        style={{ width: `${leads.length > 0 ? (leads.filter(l => l.watchedSeconds >= 1800).length / leads.length) * 100 : 0}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 5. Assistiram 45 minutos de aula */}
-                  <div>
-                    <div className="flex justify-between items-center text-xs font-medium text-zinc-300 mb-1.5">
-                      <span className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-bold font-mono">5</span>
-                        Assistiram 45 minutos de aula (+45m)
-                      </span>
-                      <span className="font-mono text-zinc-300">
-                        {leads.filter(l => l.watchedSeconds >= 2700).length} alunos ({leads.length > 0 ? Math.round((leads.filter(l => l.watchedSeconds >= 2700).length / leads.length) * 100) : 0}%)
-                      </span>
-                    </div>
-                    <div className="w-full h-3 bg-zinc-900 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-amber-500 rounded-full transition-all duration-500" 
-                        style={{ width: `${leads.length > 0 ? (leads.filter(l => l.watchedSeconds >= 2700).length / leads.length) * 100 : 0}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 6. Assistiram 60 minutos de aula */}
-                  <div>
-                    <div className="flex justify-between items-center text-xs font-medium text-zinc-300 mb-1.5">
-                      <span className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px] font-bold font-mono">6</span>
-                        Assistiram 60 minutos de aula (+60m)
-                      </span>
-                      <span className="font-mono text-zinc-300">
-                        {leads.filter(l => l.watchedSeconds >= 3600).length} alunos ({leads.length > 0 ? Math.round((leads.filter(l => l.watchedSeconds >= 3600).length / leads.length) * 100) : 0}%)
-                      </span>
-                    </div>
-                    <div className="w-full h-3 bg-zinc-900 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-purple-500 rounded-full transition-all duration-500" 
-                        style={{ width: `${leads.length > 0 ? (leads.filter(l => l.watchedSeconds >= 3600).length / leads.length) * 100 : 0}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 7. Clicaram na oferta */}
-                  <div>
-                    <div className="flex justify-between items-center text-xs font-medium text-zinc-300 mb-1.5">
-                      <span className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-bold font-mono">7</span>
-                        Clicaram na Oferta do Botão CTA
-                      </span>
-                      <span className="font-mono text-emerald-400 font-bold">
-                        {leads.filter(l => l.clickedCta).length} alunos ({leads.length > 0 ? ((leads.filter(l => l.clickedCta).length / leads.length) * 100).toFixed(1) : 0}%)
-                      </span>
-                    </div>
-                    <div className="w-full h-3.5 bg-zinc-900 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-emerald-500 rounded-full transition-all duration-500" 
-                        style={{ width: `${leads.length > 0 ? (leads.filter(l => l.clickedCta).length / leads.length) * 100 : 0}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
+          {activeTab === 'dashboard' && <DashboardPanel leads={leads} stats={stats} settings={settings} />}
 
           {/* DEDICATED LEADS TAB */}
           {activeTab === 'leads' && (
@@ -1583,7 +1314,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
               className="space-y-6"
             >
               {/* Header Banner & Controls */}
-              <div className="p-6 bg-[#1E1533] border border-zinc-800 rounded-2xl space-y-4">
+              <div className="p-6 bg-[#FFFFFF] border border-zinc-800 rounded-2xl space-y-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
                     <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -1674,7 +1405,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
               </div>
 
               {/* Leads Table */}
-              <div className="bg-[#1E1533] border border-zinc-800 rounded-2xl overflow-hidden">
+              <div className="bg-[#FFFFFF] border border-zinc-800 rounded-2xl overflow-hidden">
                 {filteredLeads.length === 0 ? (
                   <div className="text-center py-12 px-4 space-y-3">
                     <Users className="h-10 w-10 text-zinc-600 mx-auto" />
@@ -1815,7 +1546,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="bg-[#1E1533] border border-zinc-800 p-6 rounded-2xl"
+              className="bg-[#FFFFFF] border border-zinc-800 p-6 rounded-2xl"
             >
               <h3 className="text-base font-semibold text-white mb-5 border-b border-zinc-800 pb-3">Configurações Gerais do Webinar</h3>
 
@@ -2374,7 +2105,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
 
               {/* SUB TAB 1: PESSOAS ASSISTINDO AGORA (AUDIENCE) */}
               {liveSubTab === 'audience' && (
-                <div className="bg-[#1E1533] border border-zinc-800 rounded-2xl p-5 space-y-4">
+                <div className="bg-[#FFFFFF] border border-zinc-800 rounded-2xl p-5 space-y-4">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div>
                       <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -2631,7 +2362,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
               {liveSubTab === 'chat' && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   {/* Left Column: Post Message as Admin */}
-                  <div className="bg-[#1E1533] border border-zinc-800 rounded-2xl p-5 space-y-4 md:col-span-1">
+                  <div className="bg-[#FFFFFF] border border-zinc-800 rounded-2xl p-5 space-y-4 md:col-span-1">
                     <h4 className="text-sm font-bold text-white flex items-center gap-2 border-b border-zinc-800 pb-3">
                       <Send className="h-4 w-4 text-emerald-400" />
                       Enviar Mensagem no Chat
@@ -2695,7 +2426,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
                   </div>
 
                   {/* Right Column: Live Chat Stream */}
-                  <div className="bg-[#1E1533] border border-zinc-800 rounded-2xl p-5 space-y-4 md:col-span-2">
+                  <div className="bg-[#FFFFFF] border border-zinc-800 rounded-2xl p-5 space-y-4 md:col-span-2">
                     <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
                       <h4 className="text-sm font-bold text-white flex items-center gap-2">
                         <MessageSquare className="h-4 w-4 text-sky-400" />
@@ -2765,13 +2496,13 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
                   </div>
 
                   {questions.length === 0 ? (
-                    <div className="text-center py-16 bg-[#1E1533] rounded-2xl border border-zinc-800/80 text-zinc-500 text-sm">
+                    <div className="text-center py-16 bg-[#FFFFFF] rounded-2xl border border-zinc-800/80 text-zinc-500 text-sm">
                       Nenhuma pergunta individual recebida até o momento.
                     </div>
                   ) : (
                     <div className="space-y-4">
                       {questions.map((q) => (
-                        <div key={q.id} className="bg-[#1E1533] border border-zinc-800 p-5 rounded-2xl space-y-4">
+                        <div key={q.id} className="bg-[#FFFFFF] border border-zinc-800 p-5 rounded-2xl space-y-4">
                           <div className="flex justify-between items-start gap-4">
                             <div>
                               <div className="flex items-center gap-2">
@@ -2838,7 +2569,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="bg-[#1E1533] border border-zinc-800 rounded-2xl overflow-hidden"
+              className="bg-[#FFFFFF] border border-zinc-800 rounded-2xl overflow-hidden"
             >
               <div className="p-5 border-b border-zinc-800 flex justify-between items-center">
                 <h3 className="text-base font-semibold text-white">Auditoria de Progresso de Alunos</h3>
@@ -2967,7 +2698,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
               </div>
 
               {/* Sub tab details rendering */}
-              <div className="bg-[#1E1533] border border-zinc-800 p-6 rounded-2xl">
+              <div className="bg-[#FFFFFF] border border-zinc-800 p-6 rounded-2xl">
                 
                 {/* 1. Comments list editor */}
                 {contentTab === 'comments' && (
@@ -3512,6 +3243,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
 
         </AnimatePresence>
       </main>
+      </div>
     </div>
   );
 }

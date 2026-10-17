@@ -371,10 +371,10 @@ export const LiveMonitoringMap: React.FC<LiveMonitoringMapProps> = ({
   const otherPct = totalActive > 0 ? Math.round((otherCount / totalActive) * 100) : 0;
 
   return (
-    <div className={`space-y-4 ${isFullscreen ? 'fixed inset-0 z-50 bg-[#090a0f] p-6 overflow-y-auto' : ''}`}>
+    <div className={`space-y-4 ${isFullscreen ? 'fixed inset-0 z-50 bg-[#F7F5FB] p-6 overflow-y-auto' : ''}`}>
       
       {/* Top Header Banner */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-[#1E1533]/80 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-4 sm:px-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-[#FFFFFF]/80 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-4 sm:px-6">
         <div className="flex items-center gap-3">
           <div className="relative flex h-3 w-3">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -449,7 +449,7 @@ export const LiveMonitoringMap: React.FC<LiveMonitoringMapProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         
         {/* CARD 1: VIEWERS AO VIVO */}
-        <div className="bg-[#1E1533] border border-zinc-800/90 rounded-2xl p-5 relative overflow-hidden shadow-xl flex flex-col justify-between">
+        <div className="bg-[#FFFFFF] border border-zinc-800/90 rounded-2xl p-5 relative overflow-hidden shadow-xl flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold text-zinc-400 font-mono tracking-wider">
               <Users className="h-4 w-4 text-emerald-400" />
@@ -477,7 +477,7 @@ export const LiveMonitoringMap: React.FC<LiveMonitoringMapProps> = ({
         </div>
 
         {/* CARD 2: DISPOSITIVOS */}
-        <div className="bg-[#1E1533] border border-zinc-800/90 rounded-2xl p-5 relative overflow-hidden shadow-xl flex flex-col justify-between">
+        <div className="bg-[#FFFFFF] border border-zinc-800/90 rounded-2xl p-5 relative overflow-hidden shadow-xl flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold text-zinc-400 font-mono tracking-wider">
               <Activity className="h-4 w-4 text-sky-400" />
@@ -580,7 +580,7 @@ export const LiveMonitoringMap: React.FC<LiveMonitoringMapProps> = ({
       </div>
 
       {/* CARD 3: MAPA DE VIEWERS */}
-      <div className="bg-[#1E1533] border border-zinc-800/90 rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4">
+      <div className="bg-[#FFFFFF] border border-zinc-800/90 rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4">
         
         {/* Map Header & Filter Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
@@ -654,18 +654,18 @@ export const LiveMonitoringMap: React.FC<LiveMonitoringMapProps> = ({
         </div>
 
         {/* Interactive Leaflet Map Box */}
-        <div className="relative w-full h-[450px] sm:h-[540px] rounded-xl overflow-hidden border border-zinc-800/80 bg-[#090a0f]">
+        <div className="relative w-full h-[450px] sm:h-[540px] rounded-xl overflow-hidden border border-zinc-800/80 bg-[#F7F5FB]">
           <div ref={mapContainerRef} className="w-full h-full z-10" />
 
           {/* Map Overlay Stats Pill */}
-          <div className="absolute top-3 right-3 z-20 bg-[#1E1533]/90 backdrop-blur-md border border-zinc-800 px-3 py-1.5 rounded-lg text-xs font-mono text-zinc-300 flex items-center gap-2 shadow-lg">
+          <div className="absolute top-3 right-3 z-20 bg-[#FFFFFF]/90 backdrop-blur-md border border-zinc-800 px-3 py-1.5 rounded-lg text-xs font-mono text-zinc-300 flex items-center gap-2 shadow-lg">
             <span className={`w-2 h-2 rounded-full ${totalActive > 0 ? 'bg-[#8134FE] animate-ping' : 'bg-zinc-500'}`} />
             <span>Radar: <strong className="text-white">{totalActive}</strong> {totalActive === 1 ? 'ponto' : 'pontos'}</span>
           </div>
 
           {/* Selected Viewer Drawer Pill if active */}
           {selectedViewer && (
-            <div className="absolute bottom-3 left-3 right-3 sm:right-auto sm:max-w-md z-20 bg-[#1E1533]/95 backdrop-blur-md border border-emerald-500/40 p-3.5 rounded-xl shadow-2xl animate-fadeIn">
+            <div className="absolute bottom-3 left-3 right-3 sm:right-auto sm:max-w-md z-20 bg-[#FFFFFF]/95 backdrop-blur-md border border-emerald-500/40 p-3.5 rounded-xl shadow-2xl animate-fadeIn">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">

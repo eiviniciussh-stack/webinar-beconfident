@@ -18,6 +18,15 @@ export default function LoginScreen({ onLoginSuccess, onAdminClick, settings }: 
   const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();
 
+  // Count one visit per browser session (feeds the dashboard funnel)
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('bc_visit_tracked')) return;
+      sessionStorage.setItem('bc_visit_tracked', '1');
+    } catch {}
+    fetch('/api/track/visit', { method: 'POST' }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     const savedName = localStorage.getItem('webinar_user_name');
     const savedEmail = localStorage.getItem('webinar_user_email');

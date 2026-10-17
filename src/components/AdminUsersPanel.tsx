@@ -67,7 +67,7 @@ export default function AdminUsersPanel() {
   };
 
   const inputCls =
-    'w-full px-3.5 py-3 bg-[#140B26] border border-white/10 focus:border-[#8134FE] rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none';
+    'w-full px-3.5 py-3 bg-[#F7F5FB] border border-white/10 focus:border-[#8134FE] rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none';
 
   return (
     <motion.div
@@ -77,7 +77,7 @@ export default function AdminUsersPanel() {
       exit={{ opacity: 0, y: -10 }}
       className="grid grid-cols-1 lg:grid-cols-5 gap-6"
     >
-      <div className="lg:col-span-3 bg-[#1E1533] border border-white/5 rounded-2xl p-6">
+      <div className="lg:col-span-3 bg-[#FFFFFF] border border-white/5 rounded-2xl p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-lg font-semibold text-white">Administradores</h2>
@@ -91,12 +91,12 @@ export default function AdminUsersPanel() {
           {admins.map((a) => (
             <li key={a.email} className="flex items-center justify-between py-3 gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <span className="w-8 h-8 rounded-full bg-[#8134FE]/20 text-[#D0BAFD] flex items-center justify-center shrink-0">
+                <span className="w-8 h-8 rounded-full bg-[#8134FE]/20 text-[#6419DB] flex items-center justify-center shrink-0">
                   <ShieldCheck className="h-4 w-4" />
                 </span>
                 <span className="text-sm text-white truncate">
                   {a.email}
-                  {a.email === me && <span className="ml-2 text-[11px] text-[#AE88FB]">(você)</span>}
+                  {a.email === me && <span className="ml-2 text-[11px] text-[#7E2EFF]">(você)</span>}
                 </span>
               </div>
               {a.email !== me && (
@@ -113,9 +113,9 @@ export default function AdminUsersPanel() {
         </ul>
       </div>
 
-      <form onSubmit={add} className="lg:col-span-2 bg-[#1E1533] border border-white/5 rounded-2xl p-6 space-y-3 h-fit">
+      <form onSubmit={add} className="lg:col-span-2 bg-[#FFFFFF] border border-white/5 rounded-2xl p-6 space-y-3 h-fit">
         <h3 className="text-base font-semibold text-white flex items-center gap-2">
-          <UserPlus className="h-4 w-4 text-[#AE88FB]" /> Adicionar administrador
+          <UserPlus className="h-4 w-4 text-[#7E2EFF]" /> Adicionar administrador
         </h3>
         <p className="text-xs text-zinc-400">A pessoa entra no painel com este e-mail e senha.</p>
         <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@beconfident.app" className={inputCls} />
