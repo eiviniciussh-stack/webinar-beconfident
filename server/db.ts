@@ -26,6 +26,7 @@ interface DatabaseSchema {
   realComments: SyncComment[];
   activeUsers?: Record<string, { name: string; timestamp: number; device?: string; ip?: string }>;
   peakUsers?: number;
+  visits?: Record<string, number>;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -168,6 +169,7 @@ class Database {
         if (Array.isArray(config.testimonials)) this.data.testimonials = config.testimonials;
         if (typeof config.ctaClicks === 'number') this.data.ctaClicks = config.ctaClicks;
         if (typeof config.peakUsers === 'number') this.data.peakUsers = config.peakUsers;
+        if (config.visits && typeof config.visits === 'object') this.data.visits = config.visits;
         this.data.users = users;
         this.data.progress = progress;
         this.data.questions = questions.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
@@ -208,9 +210,25 @@ class Database {
     else this.saveLocalSafe();
   }
 
-  private async saveConfigKey(key: 'settings' | 'comments' | 'materials' | 'bonuses' | 'faq' | 'testimonials' | 'ctaClicks' | 'peakUsers') {
+  private async saveConfigKey(key: 'settings' | 'comments' | 'materials' | 'bonuses' | 'faq' | 'testimonials' | 'ctaClicks' | 'peakUsers' | 'visits') {
     if (this.remote) await store.saveConfig(key, (this.data as any)[key]);
     else this.saveLocalSafe();
+  }
+
+  /** Count one landing-page visit for today (America/Sao_Paulo calendar day). */
+  async trackVisit(): Promise<void> {
+    const day = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+    if (this.remote) {
+      const config = await store.loadConfig();
+      this.data.visits = (config.visits && typeof config.visits === 'object') ? config.visits : {};
+    }
+    if (!this.data.visits) this.data.visits = {};
+    this.data.visits[day] = (this.data.visits[day] || 0) + 1;
+    await this.saveConfigKey('visits');
+  }
+
+  getVisits(): Record<string, number> {
+    return this.data.visits || {};
   }
 
   storageLabel(): string {
@@ -260,6 +278,7 @@ class Database {
     if (!parsed) return;
     if (parsed.settings) this.data.settings = { ...this.data.settings, ...parsed.settings };
     
+    if (parsed.visits && typeof parsed.visits === 'object') this.data.visits = parsed.visits;
     if (typeof parsed.ctaClicks === 'number') {
       this.data.ctaClicks = Math.max(this.data.ctaClicks || 0, parsed.ctaClicks);
     }
