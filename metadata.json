@@ -1,0 +1,6 @@
+{
+  "name": "Masterclass Sistema Parceiro de Obras",
+  "description": "Plataforma oficial da Masterclass do Sistema Parceiro de Obras com sala de transmissão ao vivo, chat em tempo real, bônus, materiais e painel administrativo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
