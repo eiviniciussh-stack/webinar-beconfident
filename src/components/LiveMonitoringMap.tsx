@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { adminFetch } from '../adminAuth';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { 
@@ -83,7 +84,7 @@ export const LiveMonitoringMap: React.FC<LiveMonitoringMapProps> = ({
   // Fetch live map data from backend
   const fetchLiveMapData = async () => {
     try {
-      const res = await fetch('/api/analytics/live-map');
+      const res = await adminFetch('/api/analytics/live-map');
       if (res.ok) {
         const json: LiveAnalyticsMapData = await res.json();
         setData(json);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useToast } from './Toast';
-import { ShieldCheck, Lock, ChevronDown } from 'lucide-react';
+import { ShieldCheck, Lock } from 'lucide-react';
 import { User, Settings } from '../types';
 import BrandHeader from './BrandHeader';
 
@@ -14,7 +14,6 @@ interface LoginScreenProps {
 export default function LoginScreen({ onLoginSuccess, onAdminClick, settings }: LoginScreenProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState(''); // Stores the WhatsApp number
-  const [revenue, setRevenue] = useState('');
   const [saveData, setSaveData] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();
@@ -63,7 +62,7 @@ export default function LoginScreen({ onLoginSuccess, onAdminClick, settings }: 
       fetch('/api/users/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: cleanName, email: cleanEmail, faturamento: revenue }),
+        body: JSON.stringify({ name: cleanName, email: cleanEmail }),
         signal: controller.signal
       })
         .then(res => res.ok ? res.json() : null)
@@ -146,21 +145,6 @@ export default function LoginScreen({ onLoginSuccess, onAdminClick, settings }: 
           <form onSubmit={handleSubmit} className="space-y-3.5">
             <input type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome" className={inputCls} />
             <input type="tel" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="WhatsApp" className={inputCls} />
-
-            <div className="relative group">
-              <select
-                value={revenue}
-                onChange={(e) => setRevenue(e.target.value)}
-                className={`${inputCls} cursor-pointer appearance-none pr-10 ${revenue ? 'font-medium' : '!text-[#8A8199]'}`}
-              >
-                <option value="" disabled>Qual é faturamento mensal?</option>
-                <option value="Até R$ 50 mil">Até R$ 50 mil</option>
-                <option value="De R$ 50 mil a R$ 200 mil">De R$ 50 mil a R$ 200 mil</option>
-                <option value="De R$ 200 mil a R$ 500 mil">De R$ 200 mil a R$ 500 mil</option>
-                <option value="Acima de R$ 500 mil">Acima de R$ 500 mil</option>
-              </select>
-              <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8134FE] pointer-events-none" />
-            </div>
 
             <motion.button
               type="submit"

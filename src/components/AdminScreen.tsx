@@ -6,10 +6,12 @@ import {
   ArrowLeft, CheckCircle2, RefreshCw, Star, ArrowUpRight, Check, CheckSquare, Calendar,
   Activity, AlertTriangle, Terminal, XCircle, Info, Database,
   UserCheck, Clock, MousePointerClick, Search, Download, TrendingUp, UserPlus, ExternalLink, Filter,
-  Radio, Send, MessageSquare, Phone, Smartphone, Laptop, Tablet, Globe, MapPin, Zap
+  Radio, Send, MessageSquare, Phone, Smartphone, Laptop, Tablet, Globe, MapPin, Zap, LogOut, ShieldCheck
 } from 'lucide-react';
 import { useToast } from './Toast';
 import { BeConfidentMark } from './BrandHeader';
+import AdminUsersPanel from './AdminUsersPanel';
+import * as adminAuth from '../adminAuth';
 import { 
   Settings as AppSettings, SyncComment, FAQItem, Bonus, 
   Testimonial, Material, UserQuestion, UserProgress, WebinarStats, User, LeadInfo
@@ -47,7 +49,7 @@ function getDeviceIcon(device?: string) {
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(url, options);
+    res = await adminAuth.adminFetch(url, options);
   } catch (netErr: any) {
     const isTypeError = netErr.name === 'TypeError' || (netErr.message && netErr.message.toLowerCase().includes('fetch'));
     const msg = isTypeError 
@@ -95,35 +97,11 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings, user }: AdminScreenProps) {
-  const [passcode, setPasscode] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        const search = window.location.search.toLowerCase();
-        const hash = window.location.hash.toLowerCase();
-        const path = window.location.pathname.toLowerCase();
-        const href = window.location.href.toLowerCase();
-
-        if (
-          search.includes('admin') || 
-          search.includes('adm') || 
-          search.includes('painel') ||
-          hash.includes('admin') || 
-          hash.includes('adm') || 
-          hash.includes('painel') ||
-          path.includes('/admin') ||
-          path.includes('/painel') ||
-          href.includes('admin') ||
-          href.includes('painel') ||
-          localStorage.getItem('admin_authenticated') === 'true'
-        ) {
-          return true;
-        }
-      }
-    } catch (e) {}
-    return false;
-  });
-  const [activeTab, setActiveTab] = useState<'stats' | 'leads' | 'webinar' | 'questions' | 'users' | 'content'>('stats');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !!adminAuth.getSession());
+  const [activeTab, setActiveTab] = useState<'stats' | 'leads' | 'webinar' | 'questions' | 'users' | 'content' | 'admins'>('stats');
   const [isSaving, setIsSaving] = useState(false);
   const [dbStatus, setDbStatus] = useState<{ status: string; storage: string } | null>(null);
 
@@ -173,33 +151,32 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
   const toast = useToast();
 
   useEffect(() => {
-    if (isAuthenticated || (user && user.role === 'admin')) {
-      setIsAuthenticated(true);
-      try {
-        localStorage.setItem('admin_authenticated', 'true');
-      } catch (e) {}
-      fetchAllData();
-    }
-  }, [user]);
+    if (isAuthenticated) fetchAllData();
+    const onLogout = () => setIsAuthenticated(false);
+    window.addEventListener('bc-admin-logout', onLogout);
+    return () => window.removeEventListener('bc-admin-logout', onLogout);
+  }, []);
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoggingIn(true);
     try {
-      const res = await apiFetch<{ success: boolean }>('/api/admin/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ passcode })
-      });
-      if (res && res.success) {
-        setIsAuthenticated(true);
-        localStorage.setItem('admin_authenticated', 'true');
-        toast.success('Acesso Liberado!', 'Carregando os dados do painel administrador...');
-        fetchAllData();
-        return;
-      }
-    } catch (_) {}
+      await adminAuth.login(loginEmail.trim(), loginPassword);
+      setLoginPassword('');
+      setIsAuthenticated(true);
+      toast.success('Acesso liberado!', 'Carregando os dados do painel...');
+      fetchAllData();
+    } catch (err: any) {
+      toast.error('Não foi possível entrar', err?.message || 'Verifique e-mail e senha.');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
 
-    toast.error('Senha incorreta', 'Verifique a senha do administrador e tente novamente.');
+  const handleAdminLogout = () => {
+    adminAuth.logout();
+    setIsAuthenticated(false);
+    toast.info('Sessão encerrada', 'Você saiu do painel administrativo.');
   };
 
   const fetchAllData = async () => {
@@ -965,20 +942,34 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
           <div className="text-center mb-6">
             <div className="flex justify-center mb-3"><BeConfidentMark size={52} /></div>
             <h2 className="text-xl font-bold">Acesso Restrito</h2>
-            <p className="text-xs text-zinc-400 mt-1">Informe a chave administrativa para gerenciar o webinar.</p>
+            <p className="text-xs text-zinc-400 mt-1">Entre com seu e-mail e senha de administrador.</p>
           </div>
 
           <form onSubmit={handleAuthSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label htmlFor="passcode-input" className="text-xs font-medium text-zinc-300">Senha do Administrador</label>
+              <label htmlFor="admin-email" className="text-xs font-medium text-zinc-300">E-mail</label>
               <input
-                id="passcode-input"
+                id="admin-email"
+                type="email"
+                required
+                autoComplete="username"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                placeholder="voce@beconfident.app"
+                className="w-full px-3.5 py-3 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-white focus:outline-none focus:border-[#8134FE]"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="admin-password" className="text-xs font-medium text-zinc-300">Senha</label>
+              <input
+                id="admin-password"
                 type="password"
                 required
-                value={passcode}
-                onChange={(e) => setPasscode(e.target.value)}
-                placeholder="Digite a senha de acesso"
-                className="w-full px-3.5 py-3.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-center tracking-widest text-white focus:outline-none focus:border-zinc-700 font-mono"
+                autoComplete="current-password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                placeholder="Sua senha"
+                className="w-full px-3.5 py-3 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-white focus:outline-none focus:border-[#8134FE]"
               />
             </div>
 
@@ -994,7 +985,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
                 type="submit"
                 className="flex-1 py-3 text-xs bg-[#7E2EFF] hover:bg-[#6419DB] text-white font-semibold rounded-lg transition-colors cursor-pointer"
               >
-                Entrar
+                {isLoggingIn ? 'Entrando...' : 'Entrar'}
               </button>
             </div>
           </form>
@@ -1024,7 +1015,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
         <div className="flex items-center gap-2">
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-zinc-950 border border-zinc-800 rounded-lg text-[11px] font-mono text-zinc-400">
             <Database className="h-3 w-3 text-emerald-400" />
-            <span>Servidor Node.js (JSON DB)</span>
+            <span>{dbStatus?.storage || "Banco de dados"}</span>
           </div>
           <button
             onClick={() => {
@@ -1042,6 +1033,14 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
           >
             <RefreshCw className="h-3.5 w-3.5" />
             Sincronizar
+          </button>
+          <button
+            onClick={handleAdminLogout}
+            title={adminAuth.getSession()?.email || 'Sair'}
+            className="p-2 bg-zinc-900 hover:bg-red-500/10 border border-zinc-800 text-zinc-400 hover:text-red-300 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-xs"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Sair
           </button>
         </div>
       </header>
@@ -1292,12 +1291,24 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
             onClick={() => setActiveTab('content')}
             className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition-all cursor-pointer ${
               activeTab === 'content'
-                ? 'bg-[#1E1533] text-white border-zinc-800/80 shadow-md'
+                ? 'bg-[#7E2EFF] text-white border-transparent shadow-[0_8px_20px_-8px_rgba(126,46,255,0.8)] [&_svg]:!text-white'
                 : 'text-zinc-400 hover:text-white hover:bg-white/5 border-transparent'
             }`}
           >
             <MessageSquareCode className="h-4 w-4 text-amber-400" />
             Conteúdos da Sala
+          </button>
+
+          <button
+            onClick={() => setActiveTab('admins')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition-all cursor-pointer ${
+              activeTab === 'admins'
+                ? 'bg-[#7E2EFF] text-white border-transparent shadow-[0_8px_20px_-8px_rgba(126,46,255,0.8)] [&_svg]:!text-white'
+                : 'text-zinc-400 hover:text-white hover:bg-white/5 border-transparent'
+            }`}
+          >
+            <ShieldCheck className="h-4 w-4 text-[#AE88FB]" />
+            Administradores
           </button>
         </div>
 
@@ -1944,7 +1955,7 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
                     </div>
 
                     <div className="space-y-1.5">
-                      <label htmlFor="settings-cta-link" className="text-xs font-medium text-zinc-300">Link do Botão CTA (Hotmart / Checkout URL)</label>
+                      <label htmlFor="settings-cta-link" className="text-xs font-medium text-zinc-300">Link do Botão CTA (checkout / Checkout URL)</label>
                       <input
                         id="settings-cta-link"
                         type="text"
@@ -3496,6 +3507,8 @@ export default function AdminScreen({ onBack, onSettingsUpdated, initialSettings
               </div>
             </motion.div>
           )}
+
+          {activeTab === 'admins' && <AdminUsersPanel />}
 
         </AnimatePresence>
       </main>

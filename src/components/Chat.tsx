@@ -119,7 +119,7 @@ export default function Chat({ currentTime, syncComments, user, materials, showC
   // Fetch real user questions
   const fetchQuestions = async () => {
     try {
-      const response = await fetch('/api/questions');
+      const response = await fetch(`/api/questions?email=${encodeURIComponent((user.email || '').trim().toLowerCase())}`);
       if (response.ok) {
         const data: UserQuestion[] = await response.json();
         // Filter questions submitted by this logged-in email or userId
@@ -404,7 +404,7 @@ export default function Chat({ currentTime, syncComments, user, materials, showC
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId: user?.id, email: user?.email })
                   }).catch(err => console.error(err));
-                  window.open(settings.ctaLink || 'https://pay.hotmart.com', '_blank', 'noopener,noreferrer');
+                  window.open(settings.ctaLink || 'https://beconfident.app', '_blank', 'noopener,noreferrer');
                 }}
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
