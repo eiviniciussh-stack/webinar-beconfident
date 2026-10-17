@@ -90,9 +90,19 @@ export const store = {
 
   async countRecentPresence(ms: number): Promise<number> {
     const since = new Date(Date.now() - ms).toISOString();
-    const res = await must().from('wb_presence').select('id', { count: 'exact', head: true }).gte('updated_at', since);
+    const res = await must()
+      .from('wb_presence')
+      .select('id', { count: 'exact', head: true })
+      .gte('updated_at', since)
+      .not('id', 'like', 'agent:%');
     if (res.error) throw new Error(`Supabase (contar online): ${res.error.message}`);
     return res.count || 0;
+  },
+
+  /** Presence rows (leads and agents) updated in the last `ms` milliseconds. */
+  async listRecentPresence(ms: number): Promise<{ id: string; data: any }[]> {
+    const since = new Date(Date.now() - ms).toISOString();
+    return (check(await must().from('wb_presence').select('id,data').gte('updated_at', since), 'ler presença') as any[]) || [];
   },
 
   async isAdminEmail(email: string): Promise<boolean> {

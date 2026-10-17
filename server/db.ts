@@ -3,7 +3,7 @@ import path from 'path';
 import { 
   User, Settings, SyncComment, UserQuestion, 
   Material, FAQItem, Bonus, Testimonial, UserProgress, LeadInfo,
-  LiveAnalyticsMapData, GeoViewer, DeviceBreakdown
+  LiveAnalyticsMapData, GeoViewer, DeviceBreakdown, Webinar, SupportTicket, SupportMessage
 } from '../src/types.js';
 import { resolveIp, getFallbackLocation } from './geo.js';
 import { store, isSupabaseEnabled } from './supabase.js';
@@ -24,9 +24,10 @@ interface DatabaseSchema {
   progress: UserProgress[];
   ctaClicks: number;
   realComments: SyncComment[];
-  activeUsers?: Record<string, { name: string; timestamp: number; device?: string; ip?: string }>;
+  activeUsers?: Record<string, { name: string; timestamp: number; device?: string; ip?: string; webinarId?: string }>;
   peakUsers?: number;
   visits?: Record<string, number>;
+  webinars?: Webinar[];
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -170,13 +171,14 @@ class Database {
         if (typeof config.ctaClicks === 'number') this.data.ctaClicks = config.ctaClicks;
         if (typeof config.peakUsers === 'number') this.data.peakUsers = config.peakUsers;
         if (config.visits && typeof config.visits === 'object') this.data.visits = config.visits;
+        if (Array.isArray(config.webinars)) this.data.webinars = config.webinars;
         this.data.users = users;
         this.data.progress = progress;
         this.data.questions = questions.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
         this.data.realComments = realComments.sort((a, b) => (a.time || 0) - (b.time || 0));
         const active: NonNullable<DatabaseSchema['activeUsers']> = {};
         for (const p of presence) {
-          if (p && p.email) active[keyOf(p.email)] = { name: p.name, timestamp: p.timestamp, device: p.device, ip: p.ip };
+          if (p && p.email && (p as any).kind !== 'agent') active[keyOf(p.email)] = { name: p.name, timestamp: p.timestamp, device: p.device, ip: p.ip, webinarId: (p as any).webinarId };
         }
         this.data.activeUsers = active;
         this.lastSync = Date.now();
@@ -210,7 +212,7 @@ class Database {
     else this.saveLocalSafe();
   }
 
-  private async saveConfigKey(key: 'settings' | 'comments' | 'materials' | 'bonuses' | 'faq' | 'testimonials' | 'ctaClicks' | 'peakUsers' | 'visits') {
+  private async saveConfigKey(key: 'settings' | 'comments' | 'materials' | 'bonuses' | 'faq' | 'testimonials' | 'ctaClicks' | 'peakUsers' | 'visits' | 'webinars') {
     if (this.remote) await store.saveConfig(key, (this.data as any)[key]);
     else this.saveLocalSafe();
   }
@@ -229,6 +231,133 @@ class Database {
 
   getVisits(): Record<string, number> {
     return this.data.visits || {};
+  }
+
+  // ===================== Webinars =====================
+  getWebinars(): Webinar[] {
+    return this.data.webinars || [];
+  }
+
+  async saveWebinars(list: Webinar[]): Promise<Webinar[]> {
+    this.data.webinars = list;
+    await this.saveConfigKey('webinars');
+    return list;
+  }
+
+  // ===================== Atendimento (tickets) =====================
+  getTickets(webinarId?: string): SupportTicket[] {
+    const all = (this.data.questions as any[]).filter((q) => q && q.kind === 'ticket') as SupportTicket[];
+    return webinarId ? all.filter((t) => t.webinarId === webinarId) : all;
+  }
+
+  private putTicketInMemory(t: SupportTicket) {
+    const idx = (this.data.questions as any[]).findIndex((q) => q.id === t.id);
+    if (idx >= 0) (this.data.questions as any[])[idx] = t;
+    else (this.data.questions as any[]).push(t);
+  }
+
+  /** Re-read a ticket straight from the database (avoids losing messages written by another server instance). */
+  async loadTicket(id: string): Promise<SupportTicket | null> {
+    if (this.remote) {
+      const t = await store.getRow<SupportTicket>('wb_questions', id);
+      if (t) this.putTicketInMemory(t);
+      return t;
+    }
+    return this.getTickets().find((t) => t.id === id) || null;
+  }
+
+  async saveTicket(t: SupportTicket): Promise<SupportTicket> {
+    t.updatedAt = new Date().toISOString();
+    this.putTicketInMemory(t);
+    if (this.remote) await store.upsertRow('wb_questions', t.id, t);
+    else this.saveLocalSafe();
+    return t;
+  }
+
+  /** Lead sends a message: appends to the open ticket for this webinar or opens a new one. */
+  async leadMessage(webinarId: string, email: string, name: string, text: string): Promise<SupportTicket> {
+    const lead = keyOf(email);
+    const msg: SupportMessage = { id: 'm_' + Math.random().toString(36).slice(2, 10), from: 'lead', name, text, at: new Date().toISOString() };
+    const existing = this.getTickets(webinarId)
+      .filter((t) => keyOf(t.leadEmail) === lead && t.status !== 'closed')
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+    if (existing) {
+      const fresh = (await this.loadTicket(existing.id)) || existing;
+      if (fresh.status !== 'closed') {
+        fresh.messages = [...(fresh.messages || []), msg];
+        fresh.unreadForAgent = (fresh.unreadForAgent || 0) + 1;
+        return this.saveTicket(fresh);
+      }
+    }
+    const now = new Date().toISOString();
+    const t: SupportTicket = {
+      id: 't_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      kind: 'ticket',
+      webinarId,
+      leadEmail: email,
+      leadName: name,
+      status: 'open',
+      messages: [msg],
+      unreadForAgent: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    return this.saveTicket(t);
+  }
+
+  async agentMessage(id: string, agentEmail: string, text: string): Promise<SupportTicket | null> {
+    const t = await this.loadTicket(id);
+    if (!t) return null;
+    const agentName = agentEmail.split('@')[0];
+    t.messages = [...(t.messages || []), { id: 'm_' + Math.random().toString(36).slice(2, 10), from: 'agent', name: agentName, text, at: new Date().toISOString() }];
+    if (t.status === 'open') { t.status = 'assigned'; t.assignedTo = agentEmail; }
+    t.unreadForAgent = 0;
+    return this.saveTicket(t);
+  }
+
+  async updateTicketStatus(id: string, agentEmail: string, action: 'assign' | 'dismiss' | 'close' | 'read'): Promise<SupportTicket | null> {
+    const t = await this.loadTicket(id);
+    if (!t) return null;
+    if (action === 'assign') { t.status = 'assigned'; t.assignedTo = agentEmail; t.unreadForAgent = 0; }
+    if (action === 'dismiss') { t.status = 'closed'; t.dismissed = true; t.closedBy = agentEmail; }
+    if (action === 'close') { t.status = 'closed'; t.closedBy = agentEmail; if (!t.assignedTo) t.assignedTo = agentEmail; }
+    if (action === 'read') { t.unreadForAgent = 0; }
+    return this.saveTicket(t);
+  }
+
+  // ===================== Presença por sala =====================
+  private localAgents: Record<string, number> = {};
+
+  async agentPing(webinarId: string, email: string) {
+    const id = `agent:${webinarId}:${keyOf(email)}`;
+    if (this.remote) await store.upsertRow('wb_presence', id, { kind: 'agent', webinarId, email: keyOf(email), timestamp: Date.now() });
+    else this.localAgents[id] = Date.now();
+  }
+
+  /** Viewers and agents online per webinar right now. */
+  async roomCounts(): Promise<Record<string, { viewers: number; agents: number }>> {
+    const out: Record<string, { viewers: number; agents: number }> = {};
+    const bump = (w: string, k: 'viewers' | 'agents') => {
+      out[w] = out[w] || { viewers: 0, agents: 0 };
+      out[w][k]++;
+    };
+    if (this.remote) {
+      const rows = await store.listRecentPresence(PRESENCE_WINDOW_MS);
+      for (const r of rows) {
+        const d = r.data || {};
+        if (d.kind === 'agent') bump(d.webinarId || 'principal', 'agents');
+        else bump(d.webinarId || 'principal', 'viewers');
+      }
+      return out;
+    }
+    const now = Date.now();
+    for (const v of Object.values(this.data.activeUsers || {}) as any[]) {
+      if (now - v.timestamp <= PRESENCE_WINDOW_MS) bump(v.webinarId || 'principal', 'viewers');
+    }
+    for (const [id, ts] of Object.entries(this.localAgents)) {
+      if (now - ts <= PRESENCE_WINDOW_MS) bump(id.split(':')[1], 'agents');
+    }
+    return out;
   }
 
   storageLabel(): string {
@@ -279,6 +408,7 @@ class Database {
     if (parsed.settings) this.data.settings = { ...this.data.settings, ...parsed.settings };
     
     if (parsed.visits && typeof parsed.visits === 'object') this.data.visits = parsed.visits;
+    if (Array.isArray(parsed.webinars)) this.data.webinars = parsed.webinars;
     if (typeof parsed.ctaClicks === 'number') {
       this.data.ctaClicks = Math.max(this.data.ctaClicks || 0, parsed.ctaClicks);
     }
@@ -433,7 +563,7 @@ class Database {
   }
 
   async getQuestions(): Promise<UserQuestion[]> {
-    return this.data.questions;
+    return this.data.questions.filter((q: any) => q.kind !== 'ticket');
   }
 
   async addQuestion(name: string, email: string, question: string, userId?: string): Promise<UserQuestion> {
@@ -635,7 +765,7 @@ class Database {
     return updated;
   }
 
-  async pingUser(email: string, name?: string, device?: string, ip?: string): Promise<{ onlineNow: number }> {
+  async pingUser(email: string, name?: string, device?: string, ip?: string, webinarId?: string): Promise<{ onlineNow: number }> {
     if (!this.data.activeUsers) {
       this.data.activeUsers = {};
     }
@@ -645,6 +775,7 @@ class Database {
     const cleanEmail = keyOf(email);
     const cleanName = name ? name.trim() : 'Usuário';
     const entry = {
+      webinarId: webinarId || 'principal',
       name: cleanName,
       timestamp: Date.now(),
       device: device || this.data.activeUsers[cleanEmail]?.device,
